@@ -26,6 +26,13 @@ Prepare the application as version 5.1.
 - Update README, changelog, integration guide, screenshot and verification notes.
 - Align Gradle and application version metadata to 5.1 (2026-10-11).
 
+## Screenshot
+
+Current NodeQL for FQLite editor, captured on 2026-10-29 with a sample query and
+inline SQLite results. Only generated test data is shown.
+
+![NodeQL for FQLite editor with SQL preview and inline results](img/nodeql-current-editor.png)
+
 ## Validation
 
 - JDK 21: `./gradlew --no-daemon compileJava processResources nodeQlSmokeTest`.

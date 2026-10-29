@@ -8,6 +8,10 @@ Implementation screenshot: [current editor](img/nodeql-current-editor.png). Java
 
 State: dark editor, connected EXECUTE QUERY → SELECT → ORDER BY, a column reporter inserted into SELECT, descending order, film sample database. The implementation additionally shows the three executed result rows. The gallery uses `film_id` and an empty database preview; the current reference code exposes SELECT mode and alias controls that are absent from that older gallery state.
 
+Screenshot refreshed on 2026-10-29 from commit `41656a6`, including the updated
+`NodeQL for FQLite` heading. The documented build and all 25 smoke-test checks
+passed again during capture. The screenshot uses only the test's sample data.
+
 ## Comparison and corrections
 
 - Initial P1: SELECT keywords were elided and inputs extended past the painted block. Fixed by measuring styled content, keeping keyword widths and recalculating geometry on scene attachment. The final screenshot shows SELECT, FROM and AS inside the blue boundary; layout assertions pass.
