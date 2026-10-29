@@ -22,6 +22,9 @@ Prepare the application as version 5.1.
 - Execute queries directly with inline results and an optional expanded result
   view. Keep the SQL Analyzer as an optional hand-off.
 - Keep nodes session-only: no NodeQL workspace persistence in project files.
+- Share the main application's Light/Dark setting and toggle styling, with live
+  synchronization across the main app, builders and expanded results. No separate
+  NodeQL theme preference or new restart persistence is introduced.
 - Bundle Material Icons with its Apache 2.0 license.
 - Update README, changelog, integration guide, screenshot and verification notes.
 - Align Gradle and application version metadata to 5.1 (2026-10-11).
@@ -33,12 +36,15 @@ inline SQLite results. Only generated test data is shown.
 
 ![NodeQL for FQLite editor with SQL preview and inline results](img/nodeql-current-editor.png)
 
+![NodeQL for FQLite using the main application's light theme](img/nodeql-light-editor.png)
+
 ## Validation
 
 - JDK 21: `./gradlew --no-daemon compileJava processResources nodeQlSmokeTest`.
-- 25 JavaFX/SQLite checks: block sizes and alignment, reporter drop targets,
+- 56 JavaFX/SQLite checks: block sizes and alignment, reporter drop targets,
   insertion/detachment, nested undo, SQL generation, quoting, SQLite function
-  execution, inline result shape/order and content bounds.
+  execution, inline result shape/order and content bounds; shared theme state,
+  two-way toggles, multiple windows, rendered block text and scene cleanup.
 - Smoke test uses only a temporary in-memory database and closes its editor.
 - Visual comparison against NodeQL commit
   `bfbb70c5a6e4035041af05809d2f0f28f484aabd` (upstream version 0.4.3+2).

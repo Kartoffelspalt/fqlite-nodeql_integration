@@ -77,6 +77,21 @@ neben `File`, `Export`, `Analyze` und `Info`. NodeQL-Nodes bleiben nur für die
 Editor-Sitzung erhalten. Beim Speichern oder Laden eines FQLite-Projekts wird der
 NodeQL-Workspace nicht gespeichert oder wiederhergestellt.
 
+### Gemeinsamer Hell-/Dunkelmodus
+
+Der `Light`-/`Dark`-Schalter rechts in der NodeQL-Toolbar verwendet denselben
+`ThemeManager`, dieselbe Beschriftung und denselben Button-Stil wie das
+FQLite-Hauptfenster. Der Builder übernimmt den aktiven Modus beim Öffnen.
+Änderungen aus dem Hauptfenster oder einem Builder wirken sofort auf alle
+registrierten Fenster, einschließlich weiterer Builder, vergrößerter Ergebnisse
+und Fehlermeldungen. Workspace, Nodes und Query-Ergebnisse bleiben dabei erhalten.
+
+Es gibt keine eigene NodeQL-Theme-Konfiguration. Wie im bisherigen Hauptfenster
+gilt die Auswahl für die laufende App-Sitzung; eine neue Speicherung über
+App-Neustarts hinweg wird nicht eingeführt. Die vorhandenen FQLite-Farben und
+UI-Grundeinstellungen kommen zentral vom ThemeManager, während die farbigen
+NodeQL-Blöcke ihre Formen und gut lesbare weiße Beschriftung behalten.
+
 Der Builder unterstützt:
 
 - Kategorien: DQL, Joins & Sets, Aggregates, Functions, DML, DDL, DCL, TCL
@@ -210,7 +225,12 @@ Der Test in `tests/NodeQlSmokeTest.java` öffnet einen temporären Editor und pr
 Blockgeometrie, Snapping, Reporter-Einsetzen/-Lösen, verschachtelte Reporter und Undo,
 SQL-Kompilierung sowie die direkte SQLite-Ausführung und Ergebnisanzeige. Er nutzt
 nur eine temporäre In-Memory-Datenbank und schließt das Fenster anschließend.
-Ein Screenshot wird unter `build/reports/nodeql/editor.png` erstellt.
+Der Test enthält außerdem Prüfungen für die Theme-Übernahme, Umschalten in beide
+Richtungen, mehrere Builder, Ergebnisfenster, erhaltene Queries/Ergebnisse und
+das Entfernen von Theme-Bindings beim Schließen. Die Blockbeschriftung wird
+zusätzlich anhand der Screenshot-Pixel in beiden Modi geprüft.
+Screenshots entstehen unter `build/reports/nodeql/editor.png` (Dark) und
+`build/reports/nodeql/editor-light.png` (Light).
 Ein headless System benötigt für diesen Test eine grafische Umgebung.
 
 ### Manueller Ablauf

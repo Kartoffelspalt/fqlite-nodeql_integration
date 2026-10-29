@@ -9,6 +9,9 @@ Version date: 2026-10-11. Installer publication is a separate release workflow.
   block sizes and snapping based on each block's shape.
 - Execute queries directly inside NodeQL, with inline results and an optional
   expanded result view. The SQL Analyzer remains an optional hand-off.
+- Share FQLite's session-wide Light/Dark theme and toolbar switch. Synchronize
+  the main app, NodeQL builders, expanded results and errors in both directions;
+  reuse the main palette without introducing separate NodeQL preferences.
 - Add structured conditions, sorting direction, SELECT DISTINCT, table aliases,
   LIMIT/OFFSET and text, alias and SQLite-function reporters.
 - Keep NodeQL nodes session-only; no NodeQL project save/load persistence.

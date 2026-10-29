@@ -171,6 +171,8 @@ public class GUI extends Application {
 	 * Callbacks notified whenever the user switches the theme.
 	 */
 	private final List<Runnable> themeListeners = new ArrayList<>();
+	private final ChangeListener<Boolean> sharedThemeListener =
+			(observable, wasDark, isDark) -> syncThemeControls();
 
 	public static byte[] currently_selected_hex;
 
@@ -738,6 +740,11 @@ public class GUI extends Application {
 		topContainer.getChildren().add(splitPane);
 		scene = new Scene(topContainer, Screen.getPrimary().getVisualBounds().getWidth() * 0.9, Screen.getPrimary().getVisualBounds().getHeight() * 0.9);
 		ThemeManager.register(scene);   // ← register main window
+		ThemeManager.darkProperty().addListener(sharedThemeListener);
+		stage.addEventHandler(javafx.stage.WindowEvent.WINDOW_HIDDEN, event -> {
+			ThemeManager.darkProperty().removeListener(sharedThemeListener);
+			ThemeManager.unregister(scene);
+		});
 		VBox.setVgrow(splitPane, Priority.ALWAYS);
 
 		stage.showingProperty().addListener(new ChangeListener<>() {
@@ -844,11 +851,13 @@ public class GUI extends Application {
 	// ══════════════════════════════════════════════════════════════════════
 
 	private void toggleTheme() {
-		currentTheme = (currentTheme == GUI.Theme.DARK) ? GUI.Theme.LIGHT : GUI.Theme.DARK;
-		// Sync ThemeManager state and repaint ALL registered scenes (main + all dialogs)
-		ThemeManager.setDark(currentTheme == GUI.Theme.DARK);
+		ThemeManager.setDark(!ThemeManager.isDark());
+	}
 
-		tree.refresh();
+	private void syncThemeControls() {
+		currentTheme = ThemeManager.isDark() ? GUI.Theme.DARK : GUI.Theme.LIGHT;
+
+		if (tree != null) tree.refresh();
 		// Update the toggle button label/style
 		if (themeBtn != null) {
 			themeBtn.setText(ThemeManager.toggleLabel());
@@ -879,7 +888,7 @@ public class GUI extends Application {
 	 * Returns {@code true} when the dark theme is currently active.
 	 */
 	public boolean isDarkTheme() {
-		return currentTheme == GUI.Theme.DARK;
+		return ThemeManager.isDark();
 	}
 
 	/**

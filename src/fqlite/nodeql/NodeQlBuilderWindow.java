@@ -6,9 +6,11 @@ import digital.codespiresolutions.nodeql.Position;
 import digital.codespiresolutions.nodeql.SqlCompileResult;
 import digital.codespiresolutions.nodeql.SqlCompiler;
 import fqlite.base.GUI;
+import fqlite.base.ThemeManager;
 import fqlite.sql.InMemoryDatabase;
 import fqlite.ui.NodeObject;
 import javafx.application.Platform;
+import javafx.beans.binding.Bindings;
 import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
@@ -96,6 +98,7 @@ public final class NodeQlBuilderWindow {
     private final Font materialIconFont = Font.loadFont(
             Objects.requireNonNull(GUI.class.getResourceAsStream("/nodeql-material-icons.ttf")), 24);
     private Button runQueryButton;
+    private Button themeButton;
     private BlockView paletteDragging;
     private QueryResult lastResult;
     private final List<BlockView> blocks = new ArrayList<>();
@@ -152,6 +155,12 @@ public final class NodeQlBuilderWindow {
         });
         scene.getStylesheets().add(Objects.requireNonNull(GUI.class.getResource("/nodeql-builder.css")).toExternalForm());
         stage.setScene(scene);
+        ThemeManager.register(scene);
+        stage.setOnHidden(event -> {
+            ThemeManager.unregister(scene);
+            themeButton.textProperty().unbind();
+            themeButton.styleProperty().unbind();
+        });
         stage.show();
         root.applyCss();
         root.layout();
@@ -188,8 +197,17 @@ public final class NodeQlBuilderWindow {
         resetZoom.setOnAction(e -> setZoom(1.0));
 
         zoomLabel.setMinWidth(48);
+        themeButton = new Button();
+        themeButton.textProperty().bind(Bindings.createStringBinding(
+                ThemeManager::toggleLabel, ThemeManager.darkProperty()));
+        themeButton.styleProperty().bind(Bindings.createStringBinding(
+                ThemeManager::toggleBtnStyle, ThemeManager.darkProperty()));
+        themeButton.setTooltip(new Tooltip("Switch the theme for all FQLite windows"));
+        themeButton.setOnAction(event -> ThemeManager.setDark(!ThemeManager.isDark()));
+        Region spacer = new Region();
+        HBox.setHgrow(spacer, Priority.ALWAYS);
         ToolBar toolbar = new ToolBar(brand, databaseLabel, runQueryButton, undo, delete, clear,
-                zoomOut, zoomIn, resetZoom, zoomLabel, sendToAnalyzer);
+                zoomOut, zoomIn, resetZoom, zoomLabel, sendToAnalyzer, spacer, themeButton);
         return toolbar;
     }
 
@@ -280,6 +298,8 @@ public final class NodeQlBuilderWindow {
         resultsStage.setScene(new Scene(root, 960, 640));
         resultsStage.getScene().getStylesheets().add(
                 Objects.requireNonNull(GUI.class.getResource("/nodeql-builder.css")).toExternalForm());
+        ThemeManager.register(resultsStage.getScene());
+        resultsStage.setOnHidden(event -> ThemeManager.unregister(resultsStage.getScene()));
         resultsStage.setMaximized(true);
         resultsStage.show();
     }
@@ -292,6 +312,8 @@ public final class NodeQlBuilderWindow {
             alert.setContentText(exception.getMessage());
         }
         alert.initOwner(stage);
+        ThemeManager.register(alert.getDialogPane().getScene());
+        alert.setOnHidden(event -> ThemeManager.unregister(alert.getDialogPane().getScene()));
         alert.showAndWait();
     }
 
@@ -398,6 +420,7 @@ public final class NodeQlBuilderWindow {
         preview.setMinWidth(0);
         Path shape = createBlockShape(template.visualKind(), width, height, Color.web(template.nodeColor()));
         Label label = new Label(template.previewLabel());
+        label.getStyleClass().add("block-label");
         label.setFont(Font.font("System", FontWeight.BOLD, 15));
         label.setTextFill(Color.WHITE);
         label.setMaxWidth(width - 30);
@@ -458,7 +481,7 @@ public final class NodeQlBuilderWindow {
     private ScrollPane createWorkspace() {
         workspace.setMinSize(CANVAS_WIDTH, CANVAS_HEIGHT);
         workspace.setPrefSize(CANVAS_WIDTH, CANVAS_HEIGHT);
-        workspace.setStyle("-fx-background-color: #111827;");
+        workspace.getStyleClass().add("workspace-canvas");
         workspace.getChildren().addAll(createGridLines());
         workspace.getChildren().add(createTriggerView());
         workspace.addEventFilter(ScrollEvent.SCROLL, event -> {
@@ -507,7 +530,7 @@ public final class NodeQlBuilderWindow {
         VBox.setVgrow(resultTable, Priority.ALWAYS);
 
         Label credit = new Label("NodeQL Implementation by Paul Bodach (CodeSpire-Solutions)");
-        credit.setStyle("-fx-text-fill: #64748b; -fx-font-size: 10px;");
+        credit.getStyleClass().add("credit");
 
         box.getChildren().addAll(label, sqlPreview, resultHeader, resultStatus, resultTable, credit);
         return box;
@@ -656,14 +679,14 @@ public final class NodeQlBuilderWindow {
         List<Line> lines = new ArrayList<>();
         for (double x = 0; x <= CANVAS_WIDTH; x += GRID_SIZE) {
             Line line = new Line(x, 0, x, CANVAS_HEIGHT);
-            line.setStroke(Color.rgb(148, 163, 184, x % (GRID_SIZE * 4) == 0 ? 0.06 : 0.025));
+            line.getStyleClass().add(x % (GRID_SIZE * 4) == 0 ? "grid-major" : "grid-minor");
             line.setStrokeWidth(x % (GRID_SIZE * 4) == 0 ? 1.2 : 0.7);
             line.setMouseTransparent(true);
             lines.add(line);
         }
         for (double y = 0; y <= CANVAS_HEIGHT; y += GRID_SIZE) {
             Line line = new Line(0, y, CANVAS_WIDTH, y);
-            line.setStroke(Color.rgb(148, 163, 184, y % (GRID_SIZE * 4) == 0 ? 0.06 : 0.025));
+            line.getStyleClass().add(y % (GRID_SIZE * 4) == 0 ? "grid-major" : "grid-minor");
             line.setStrokeWidth(y % (GRID_SIZE * 4) == 0 ? 1.2 : 0.7);
             line.setMouseTransparent(true);
             lines.add(line);

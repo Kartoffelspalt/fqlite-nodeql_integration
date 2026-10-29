@@ -1,12 +1,15 @@
 // Desktop integration smoke test; private editor state is inspected intentionally.
 // No user files or databases are opened. Run with ./gradlew nodeQlSmokeTest.
 import fqlite.nodeql.NodeQlBuilderWindow;
+import fqlite.base.GUI;
+import fqlite.base.ThemeManager;
 import fqlite.sql.InMemoryDatabase;
 import fqlite.ui.NodeObject;
 import javafx.application.Application;
 import javafx.application.Platform;
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
+import javafx.animation.PauseTransition;
 import javafx.util.Duration;
 import javafx.stage.Stage;
 import javafx.scene.layout.Region;
@@ -14,6 +17,12 @@ import javafx.scene.control.TextField;
 import javafx.scene.control.TextArea;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TableView;
+import javafx.scene.control.Button;
+import javafx.scene.Scene;
+import javafx.scene.layout.VBox;
+import javafx.scene.paint.Color;
+import javafx.stage.Window;
+import javafx.beans.value.ChangeListener;
 import javafx.embed.swing.SwingFXUtils;
 import javax.imageio.ImageIO;
 import java.io.File;
@@ -24,6 +33,10 @@ public class NodeQlSmokeTest extends Application {
     private NodeQlBuilderWindow builder;
     private InMemoryDatabase db;
     private int checks;
+    private GUI mainApp;
+    private Scene mainScene;
+    private Button mainThemeButton;
+    private ChangeListener<Boolean> mainThemeListener;
     private Object get(Object object, String key) throws Exception {
         Field field = object.getClass().getDeclaredField(key);
         field.setAccessible(true);
@@ -56,13 +69,136 @@ public class NodeQlSmokeTest extends Application {
         if (!value) throw new AssertionError(message);
         checks++;
     }
+
+    private Color background(Scene scene) {
+        scene.getRoot().applyCss();
+        scene.getRoot().layout();
+        return (Color) ((Region) scene.getRoot()).getBackground().getFills().get(0).getFill();
+    }
+
+    private void verifyInitialTheme() throws Exception {
+        Stage stage = (Stage) get(builder, "stage");
+        Button toggle = (Button) get(builder, "themeButton");
+        Color light = background(stage.getScene());
+        check(light.equals(background(mainScene)), "builder must inherit main app's light palette");
+        check(toggle.getText().equals(ThemeManager.toggleLabel()), "initial theme button label");
+        check(light.getBrightness() > 0.9, "builder opened dark despite light app setting");
+
+        toggle.fire();
+        check(ThemeManager.isDark() && mainApp.isDarkTheme(), "builder toggle must update app theme");
+        check(mainThemeButton.getText().equals(toggle.getText()), "main toggle label is stale");
+        check(mainThemeButton.getStyle().equals(toggle.getStyle()), "builder must reuse main toggle styling");
+        check(background(stage.getScene()).getBrightness() < 0.3, "dark builder background");
+        check(background(stage.getScene()).equals(background(mainScene)), "main scene did not change with builder");
+
+        Method mainToggle = GUI.class.getDeclaredMethod("toggleTheme");
+        mainToggle.setAccessible(true);
+        mainToggle.invoke(mainApp);
+        check(!ThemeManager.isDark(), "main app toggle failed");
+        check(background(stage.getScene()).equals(light), "main toggle did not update builder");
+        check(toggle.getText().equals(ThemeManager.toggleLabel()), "builder toggle label is stale");
+        ThemeManager.setDark(true);
+    }
+
+    private int registeredScenes() throws Exception {
+        Field scenes = ThemeManager.class.getDeclaredField("scenes");
+        scenes.setAccessible(true);
+        return ((List<?>) scenes.get(null)).size();
+    }
+
+    private void captureAfterPulse(Stage stage, File file, Runnable next) {
+        // Let CSS, text skins and native window layout settle before taking a real frame.
+        PauseTransition settle = new PauseTransition(Duration.millis(250));
+        settle.setOnFinished(event -> {
+            try {
+                var snapshot = stage.getScene().snapshot(null);
+                Region canvas = (Region) get(builder, "workspace");
+                for (var node : canvas.lookupAll(".label")) {
+                    if (!(node instanceof javafx.scene.control.Label label)
+                            || !(label.getText().equals("SELECT") || label.getText().equals("EXECUTE QUERY"))) continue;
+                    var bounds = label.localToScene(label.getBoundsInLocal());
+                    int white = 0;
+                    for (int y = Math.max(0, (int) bounds.getMinY()); y < Math.min(snapshot.getHeight(), bounds.getMaxY()); y++) {
+                        for (int x = Math.max(0, (int) bounds.getMinX()); x < Math.min(snapshot.getWidth(), bounds.getMaxX()); x++) {
+                            Color pixel = snapshot.getPixelReader().getColor(x, y);
+                            if (pixel.getRed() > 0.9 && pixel.getGreen() > 0.9 && pixel.getBlue() > 0.9) white++;
+                        }
+                    }
+                    check(white > 20, "block text did not render after theme switch: " + label.getText());
+                }
+                ImageIO.write(SwingFXUtils.fromFXImage(snapshot, null), "png", file);
+                next.run();
+            } catch (Throwable error) { error.printStackTrace(); System.exit(1); }
+        });
+        settle.play();
+    }
+
+    private void verifyResultThemes(Stage stage, File screenshot, Runnable finished) throws Exception {
+        Button toggle = (Button) get(builder, "themeButton");
+        String query = sql();
+        Object selection = get(builder, "selected");
+        call("showResultsFullscreen");
+        Stage results = (Stage) Window.getWindows().stream()
+                .filter(window -> window instanceof Stage s && s.getOwner() == stage
+                        && s.getTitle().startsWith("NodeQL Results"))
+                .findFirst().orElseThrow();
+        check(background(results.getScene()).equals(background(stage.getScene())), "expanded results initial theme");
+
+        toggle.fire();
+        check(!ThemeManager.isDark(), "light toggle with results open");
+        check(background(results.getScene()).equals(background(stage.getScene())), "expanded results must follow theme changes");
+        Region canvas = (Region) get(builder, "workspace");
+        check(((Color) canvas.getBackground().getFills().get(0).getFill()).getBrightness() > 0.9, "workspace stayed dark");
+        checkBlockTextContrast(stage);
+        check(sql().equals(query) && get(builder, "selected") == selection, "theme switch changed workspace state");
+        check(((TableView<?>) get(builder, "resultTable")).getItems().size() == 3, "theme switch cleared results");
+        int count = registeredScenes();
+        NodeQlBuilderWindow other = new NodeQlBuilderWindow(mainApp,
+                new TreeItem<>(new NodeObject("second.sqlite", true)), db, stage);
+        other.show();
+        Stage otherStage = (Stage) get(other, "stage");
+        check(background(otherStage.getScene()).equals(background(stage.getScene())), "new builder must inherit current theme");
+        ((Button) get(other, "themeButton")).fire();
+        check(ThemeManager.isDark() && mainApp.isDarkTheme(), "second builder toggle must update app");
+        check(background(stage.getScene()).equals(background(otherStage.getScene())), "open builders are not synchronized");
+        check(background(results.getScene()).equals(background(stage.getScene())), "expanded results missed second toggle");
+        otherStage.close();
+        check(registeredScenes() == count, "closed builder scene leaked");
+        check(!((Button) get(other, "themeButton")).textProperty().isBound(), "closed builder toggle binding leaked");
+        results.close();
+        check(registeredScenes() == count - 1, "closed results scene leaked");
+        check(background(stage.getScene()).getBrightness() < 0.3, "dark theme did not restore");
+        stage.toFront();
+        toggle.fire();
+        captureAfterPulse(stage, new File(screenshot.getParentFile(), "editor-light.png"), () -> {
+            toggle.fire();
+            captureAfterPulse(stage, screenshot, finished);
+        });
+    }
+
+    private void checkBlockTextContrast(Stage stage) {
+        javafx.scene.control.Label blockLabel = (javafx.scene.control.Label) stage.getScene().lookup(".block-label");
+        check(blockLabel.getTextFill().equals(Color.WHITE), "light theme reduced palette block text contrast");
+    }
     @Override public void start(Stage owner) {
         try {
             db = new InMemoryDatabase("NodeQL verification");
             db.getConnectionObject().createStatement().execute("CREATE TABLE film (id INTEGER, title TEXT)");
             db.getConnectionObject().createStatement().execute("INSERT INTO film VALUES (1, 'First'), (2, 'Second'), (3, 'Third')");
-            builder = new NodeQlBuilderWindow(null, new TreeItem<>(new NodeObject("film.sqlite", true)), db, owner);
+            // Exercise actual GUI theme callbacks without starting importers or reading user settings.
+            mainApp = new GUI();
+            mainThemeButton = new Button();
+            Field toggleField = GUI.class.getDeclaredField("themeBtn");
+            toggleField.setAccessible(true);
+            toggleField.set(mainApp, mainThemeButton);
+            mainThemeListener = (ChangeListener<Boolean>) get(mainApp, "sharedThemeListener");
+            ThemeManager.darkProperty().addListener(mainThemeListener);
+            mainScene = new Scene(new VBox(mainThemeButton));
+            ThemeManager.register(mainScene);
+            ThemeManager.setDark(false);
+            builder = new NodeQlBuilderWindow(mainApp, new TreeItem<>(new NodeObject("film.sqlite", true)), db, owner);
             builder.show();
+            verifyInitialTheme();
             Object select = add("SELECT");
             input(select, "table", "film");
             snap(select, 3880);
@@ -175,11 +311,17 @@ public class NodeQlSmokeTest extends Application {
                     }
                     File screenshot = new File(System.getProperty("nodeql.screenshot", "build/reports/nodeql/editor.png"));
                     java.nio.file.Files.createDirectories(screenshot.getAbsoluteFile().getParentFile().toPath());
-                    ImageIO.write(SwingFXUtils.fromFXImage(stage.getScene().snapshot(null), null), "png", screenshot);
-                    System.out.println("NODEQL VERIFICATION PASSED: " + checks + " checks; " + screenshot.getAbsolutePath());
-                    db.getConnectionObject().close();
-                    stage.close();
-                    Platform.exit();
+                    verifyResultThemes(stage, screenshot, () -> {
+                        try {
+                            db.getConnectionObject().close();
+                            stage.close();
+                            ThemeManager.unregister(mainScene);
+                            ThemeManager.darkProperty().removeListener(mainThemeListener);
+                            check(registeredScenes() == 0, "builder or main test scene was not unregistered");
+                            System.out.println("NODEQL VERIFICATION PASSED: " + checks + " checks; " + screenshot.getAbsolutePath());
+                            Platform.exit();
+                        } catch (Throwable error) { error.printStackTrace(); System.exit(1); }
+                    });
                 } catch (Throwable error) { error.printStackTrace(); System.exit(1); }
             }));
             wait.setCycleCount(Timeline.INDEFINITE);

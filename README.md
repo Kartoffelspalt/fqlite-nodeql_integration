@@ -114,6 +114,16 @@ This is a JavaFX integration, not the standalone Flutter application.
 NodeQL workspaces are session-only: nodes are **not saved or restored with
 FQLite projects**. Undo is available inside the editor.
 
+The **Light/Dark switch** at the right of the toolbar uses FQLite's shared theme
+setting and button style. Switching in either window updates the main app, all
+open NodeQL builders and expanded results. There is no separate NodeQL theme
+preference; like the main app, the selection applies to the current session.
+
+<details>
+  <summary>Light theme preview</summary>
+  <img width="95%" src="img/nodeql-light-editor.png?raw=true" alt="NodeQL for FQLite using the main application's light theme"/>
+</details>
+
 See the [integration and usage guide](NODEQL_INTEGRATION_GUIDE.md),
 [verification notes](design-qa.md) and [5.1 changelog](CHANGELOG.md).
 The upstream FQLite PDF user manual is unchanged; this guide documents the
@@ -142,7 +152,8 @@ Run the NodeQL integration smoke test on a graphical desktop:
 ```
 
 The test opens and closes a temporary editor, uses an in-memory sample database,
-and writes a screenshot to `build/reports/nodeql/editor.png`. It does not open
+and writes screenshots to `build/reports/nodeql/editor.png` and
+`build/reports/nodeql/editor-light.png`. It does not open
 or modify user databases or projects.
 
 # Installation

@@ -8,9 +8,10 @@ Implementation screenshot: [current editor](img/nodeql-current-editor.png). Java
 
 State: dark editor, connected EXECUTE QUERY → SELECT → ORDER BY, a column reporter inserted into SELECT, descending order, film sample database. The implementation additionally shows the three executed result rows. The gallery uses `film_id` and an empty database preview; the current reference code exposes SELECT mode and alias controls that are absent from that older gallery state.
 
-Screenshot refreshed on 2026-10-29 from commit `41656a6`, including the updated
-`NodeQL for FQLite` heading. The documented build and all 25 smoke-test checks
-passed again during capture. The screenshot uses only the test's sample data.
+Screenshots refreshed on 2026-10-29 with the `NodeQL for FQLite` heading and the
+shared FQLite theme switch: [Dark](img/nodeql-current-editor.png) and
+[Light](img/nodeql-light-editor.png). The build and all 56 smoke-test checks
+passed during capture. Screenshots use only the test's sample data.
 
 ## Comparison and corrections
 
@@ -24,13 +25,13 @@ passed again during capture. The screenshot uses only the test's sample data.
 
 - Typography: block keywords use 15 px bold text, matching the current painter's 15 px / weight 700. JavaFX system text is retained for native FQLite integration; Flutter/JavaFX antialiasing differs.
 - Spacing: body heights follow the reference kinds (44 px expressions, 50 px clauses/trigger, 56 px statements, 86/66 px joins, 54 px sets, 48 px terminals); connector depth is 8 px. Width follows input content, and the three panels are resizable.
-- Colors: current NodeQL dark background and query/source/filter/join/set/expression/mutation/schema/transaction color families are applied. Selection uses the reference yellow outline.
+- Colors: surrounding panels, SQL, results and canvas use FQLite's central light/dark palette. Query/source/filter/join/set/expression/mutation/schema/transaction blocks retain their NodeQL color families, white text and reference yellow selection outline. The app palette around the blocks is an intentional integration difference.
 - Assets: official Material Icons font provides the rail symbols and play icon; its Apache 2.0 license is included in resources. Blocks are interactive JavaFX vector controls, corresponding to the original custom-painted UI components.
 - Copy: English labels follow the existing FQLite UI. Palette descriptions explain statements and reporter placement; the original integration attribution is retained.
 
 ## Functional evidence
 
-The JavaFX harness [NodeQlSmokeTest.java](tests/NodeQlSmokeTest.java) passed 25 checks against a temporary in-memory SQLite database. Run it on a graphical desktop with JDK 21 using `./gradlew nodeQlSmokeTest`; it writes a new screenshot to `build/reports/nodeql/editor.png`. Coverage includes per-kind heights, chain alignment, reporter drop-target recognition, insertion/detachment, nested reporter undo, WHERE and ORDER BY generation, table alias, DISTINCT, LIMIT/OFFSET, text escaping, nested SQLite function/alias execution, inline result columns/rows/order, and content bounds. Java compilation and resource processing passed. No application exception or CSS parsing error occurred; JavaFX emitted its standard unnamed-module warning for the harness.
+The JavaFX harness [NodeQlSmokeTest.java](tests/NodeQlSmokeTest.java) passed 56 checks against a temporary in-memory SQLite database. Run it on a graphical desktop with JDK 21 using `./gradlew nodeQlSmokeTest`; it writes screenshots to `build/reports/nodeql/editor.png` and `build/reports/nodeql/editor-light.png`. Coverage includes per-kind heights, chain alignment, reporter drop-target recognition, insertion/detachment, nested reporter undo, WHERE and ORDER BY generation, table alias, DISTINCT, LIMIT/OFFSET, text escaping, nested SQLite function/alias execution, inline result columns/rows/order, and content bounds. Theme checks exercise the actual GUI callback and toggle logic on isolated controls without starting the full main application or reading user settings: initial light-mode inheritance, two-way switching, shared palette/button styling, multiple builders, expanded results, unchanged query/result state and cleanup. Snapshot pixels verify that the trigger and SELECT text still render after repeated switches. Java compilation and resource processing passed without CSS errors; standard JavaFX unnamed-module and SLF4J no-provider warnings remain.
 
 Native pointer automation, every pre-existing SQL template, and other display densities were not exhaustively tested. Plugin management, standalone application settings, workshop mode and standalone project persistence are outside this integration change.
 
