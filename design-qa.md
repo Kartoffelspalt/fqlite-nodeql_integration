@@ -11,7 +11,7 @@ State: dark editor, connected EXECUTE QUERY → SELECT → ORDER BY, a column re
 Screenshots refreshed on 2026-10-30 with the `NodeQL for FQLite` heading, table
 and column suggestion buttons and the
 shared FQLite theme switch: [Dark](img/nodeql-current-editor.png) and
-[Light](img/nodeql-light-editor.png). The build and all 175 smoke-test checks
+[Light](img/nodeql-light-editor.png). The build and all 199 smoke-test checks
 passed during capture. Screenshots use only the test's sample data.
 
 ## Comparison and corrections
@@ -60,7 +60,14 @@ schema refresh, multi-projection preservation (including commas in functions and
 strings), custom expressions and nested reporter selection/undo/detachment.
 Complex subqueries remain free-form inputs rather than being parsed for metadata.
 
-The JavaFX harness [NodeQlSmokeTest.java](tests/NodeQlSmokeTest.java) passed 175 checks against a temporary in-memory SQLite database. Run it on a graphical desktop with JDK 21 using `./gradlew nodeQlSmokeTest`; it writes screenshots to `build/reports/nodeql/editor.png` and `build/reports/nodeql/editor-light.png`. Coverage includes per-kind heights, chain alignment, reporter drop-target recognition, insertion/detachment, nested reporter undo, WHERE and ORDER BY generation, table alias, DISTINCT, LIMIT/OFFSET, text escaping, nested SQLite function/alias execution, inline result columns/rows/order, and content bounds. Theme checks exercise the actual GUI callback and toggle logic on isolated controls without starting the full main application or reading user settings: initial light-mode inheritance, two-way switching, shared palette/button styling, multiple builders, expanded results, unchanged query/result state and cleanup. Snapshot pixels verify that the trigger and SELECT text still render after repeated switches. Java compilation and resource processing passed without CSS errors; standard JavaFX unnamed-module and SLF4J no-provider warnings remain.
+The [column multi-picker](img/nodeql-column-multiselect.png) is an actual JavaFX
+dialog, not a mockup. Its screenshot shows `id` and `title` checked before Apply.
+Checkbox tests cover preselected quoted/unquoted identifiers, retained choice order
+and selections during search, wildcard exclusivity, preserved/removable custom SQL,
+Cancel without mutation, Apply as one undo action, aliases/JOINs/GROUP BY, embedded
+COLUMN reporters, >20 available columns and shared theme/scene lifecycle cleanup.
+
+The JavaFX harness [NodeQlSmokeTest.java](tests/NodeQlSmokeTest.java) passed 199 checks against a temporary in-memory SQLite database. Run it on a graphical desktop with JDK 21 using `./gradlew nodeQlSmokeTest`; it writes screenshots to `build/reports/nodeql/editor.png` and `build/reports/nodeql/editor-light.png`. Coverage includes per-kind heights, chain alignment, reporter drop-target recognition, insertion/detachment, nested reporter undo, WHERE and ORDER BY generation, table alias, DISTINCT, LIMIT/OFFSET, text escaping, nested SQLite function/alias execution, inline result columns/rows/order, and content bounds. Theme checks exercise the actual GUI callback and toggle logic on isolated controls without starting the full main application or reading user settings: initial light-mode inheritance, two-way switching, shared palette/button styling, multiple builders, expanded results, unchanged query/result state and cleanup. Snapshot pixels verify that the trigger and SELECT text still render after repeated switches. Java compilation and resource processing passed without CSS errors; standard JavaFX unnamed-module and SLF4J no-provider warnings remain.
 
 Native pointer automation, every pre-existing SQL template, and other display densities were not exhaustively tested. Plugin management, standalone application settings, workshop mode and standalone project persistence are outside this integration change.
 

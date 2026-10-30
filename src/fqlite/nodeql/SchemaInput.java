@@ -13,6 +13,7 @@ import javafx.scene.input.KeyEvent;
 import javafx.scene.layout.HBox;
 
 import java.util.List;
+import java.util.ArrayList;
 import java.util.Locale;
 import java.util.function.Supplier;
 
@@ -26,6 +27,7 @@ final class SchemaInput extends HBox {
     private final ContextMenu suggestions = new ContextMenu();
     private List<Suggestion> entries = List.of();
     private boolean choosing;
+    private ColumnSelectionDialog activePicker;
 
     SchemaInput(TextField editor, String kind, Supplier<List<Suggestion>> source, boolean projectionList) {
         super(3);
@@ -68,12 +70,46 @@ final class SchemaInput extends HBox {
         });
         editor.sceneProperty().addListener((observable, old, scene) -> {
             if (old != null) old.focusOwnerProperty().removeListener(focusListener);
-            if (scene == null) suggestions.hide();
+            if (scene == null) {
+                suggestions.hide();
+                if (activePicker != null) activePicker.close();
+            }
             else scene.focusOwnerProperty().addListener(focusListener);
         });
         suggestions.setOnShowing(event -> ThemeManager.register(suggestions.getScene()));
         suggestions.setOnHidden(event -> ThemeManager.unregister(suggestions.getScene()));
         getChildren().addAll(editor, browse);
+        if (projectionList) {
+            Button multiple = new Button("☑");
+            multiple.getStyleClass().add("schema-suggestions-button");
+            multiple.setAccessibleText("Select multiple columns");
+            multiple.setTooltip(new Tooltip("Check multiple columns and apply them together"));
+            multiple.setFocusTraversable(false);
+            multiple.setOnAction(event -> openMultiSelection());
+            getChildren().add(multiple);
+        }
+    }
+
+    private void openMultiSelection() {
+        if (activePicker != null || editor.getScene() == null || !editor.getScene().getWindow().isShowing()) return;
+        choosing = true;
+        suggestions.hide();
+        activePicker = new ColumnSelectionDialog(source.get(), splitProjections(editor.getText()));
+        ColumnSelectionDialog picker = activePicker;
+        picker.initOwner(editor.getScene().getWindow());
+        picker.setOnShowing(event -> ThemeManager.register(picker.getDialogPane().getScene()));
+        // Dialog may detach its pane before onHidden; unregister while its scene still exists.
+        picker.setOnHiding(event -> ThemeManager.unregister(picker.getDialogPane().getScene()));
+        picker.setOnHidden(event -> {
+            if (picker.getResult() != null && !picker.getResult().isEmpty()) {
+                editor.setText(String.join(", ", picker.getResult().stream().map(Suggestion::sql).toList()));
+            }
+            editor.requestFocus();
+            editor.positionCaret(editor.getLength());
+            activePicker = null;
+            choosing = false;
+        });
+        picker.show();
     }
 
     private void showSuggestions(boolean filter) {
@@ -104,7 +140,24 @@ final class SchemaInput extends HBox {
     }
     private int projectionStart(String text) {
         if (!projectionList) return 0;
-        int start = 0, depth = 0;
+        return projectionStarts(text).getLast();
+    }
+
+    static List<String> splitProjections(String text) {
+        List<Integer> starts = projectionStarts(text);
+        List<String> parts = new ArrayList<>();
+        for (int i = 0; i < starts.size(); i++) {
+            int end = i + 1 < starts.size() ? starts.get(i + 1) - 1 : text.length();
+            String part = text.substring(starts.get(i), end).strip();
+            if (!part.isEmpty()) parts.add(part);
+        }
+        return parts;
+    }
+
+    private static List<Integer> projectionStarts(String text) {
+        List<Integer> starts = new ArrayList<>();
+        starts.add(0);
+        int depth = 0;
         char quote = 0;
         for (int i = 0; i < text.length(); i++) {
             char c = text.charAt(i);
@@ -117,8 +170,8 @@ final class SchemaInput extends HBox {
             else if (c == '[') quote = ']';
             else if (c == '(') depth++;
             else if (c == ')') depth = Math.max(0, depth - 1);
-            else if (c == ',' && depth == 0) start = i + 1;
+            else if (c == ',' && depth == 0) starts.add(i + 1);
         }
-        return start;
+        return starts;
     }
 }

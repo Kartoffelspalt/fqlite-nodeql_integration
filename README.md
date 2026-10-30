@@ -113,6 +113,10 @@ This is a JavaFX integration, not the standalone Flutter application.
    Column inputs provide the same suggestions for the selected table(s), including
    aliases and qualified JOIN columns. In SELECT lists, type a comma to add another
    suggested column; existing projections and custom SQL expressions are retained.
+   Or click **☑** to select multiple columns with checkboxes and apply them together.
+   Existing selections are prechecked, filtering keeps checked items, and Cancel
+   leaves the input unchanged. SELECT, COLUMN reporters, GROUP BY and function
+   argument lists support this picker; free SQL input is still available.
 3. Click **Run Query** or the yellow start block. SQL and results stay in the
    NodeQL editor; **Expand results** opens a larger result view. Opening the SQL
    Analyzer is optional.
@@ -132,6 +136,11 @@ the palette's `EXECUTE QUERY` card explicitly returns to the query chain.
 <details>
   <summary>Light theme preview</summary>
   <img width="95%" src="img/nodeql-light-editor.png?raw=true" alt="NodeQL for FQLite using the main application's light theme"/>
+</details>
+
+<details>
+  <summary>Column multi-selection preview</summary>
+  <img src="img/nodeql-column-multiselect.png?raw=true" alt="Searchable column checklist with id and title selected, Apply and Cancel"/>
 </details>
 
 See the [integration and usage guide](NODEQL_INTEGRATION_GUIDE.md),

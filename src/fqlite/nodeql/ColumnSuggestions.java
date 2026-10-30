@@ -33,6 +33,21 @@ final class ColumnSuggestions {
 
     static String quote(String name) { return "\"" + name.replace("\"", "\"\"") + "\""; }
 
+    /** Compare identifier spellings without confusing a quoted dot with qualification. */
+    static String referenceKey(String sql) {
+        String text = sql.strip();
+        if (text.equals("*")) return "*";
+        if (text.endsWith(".*")) {
+            String prefix = referenceKey(text.substring(0, text.length() - 2));
+            return prefix == null ? null : prefix + "\u0000*";
+        }
+        var match = REFERENCE.matcher(text);
+        if (!match.matches() || match.group(3) != null) return null;
+        String first = unquote(match.group(1)).toLowerCase(Locale.ROOT);
+        return match.group(2) == null ? "U:" + first
+                : "Q:" + first + "\u0000" + unquote(match.group(2)).toLowerCase(Locale.ROOT);
+    }
+
     private static String unquote(String text) {
         if (text.length() < 2) return text;
         char first = text.charAt(0), last = text.charAt(text.length() - 1);

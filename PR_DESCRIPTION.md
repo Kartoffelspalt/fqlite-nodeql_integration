@@ -29,6 +29,8 @@ Prepare the application as version 5.1.
 - Suggest columns in SELECT, filters, grouping, sorting, JOINs and expression
   reporters. Respect table aliases, omit ambiguous bare JOIN names, preserve
   previous SELECT list entries and keep custom SQL fully editable.
+- Add a real checkbox multi-picker (`☑`), with search, preselected columns,
+  filter-stable selections, Apply/Cancel, preserved custom SQL and one-step Undo.
 - Share the main application's Light/Dark setting and toggle styling, with live
   synchronization across the main app, builders and expanded results. No separate
   NodeQL theme preference or new restart persistence is introduced.
@@ -45,10 +47,12 @@ inline SQLite results. Only generated test data is shown.
 
 ![NodeQL for FQLite using the main application's light theme](img/nodeql-light-editor.png)
 
+![Column checkbox multi-selection before Apply](img/nodeql-column-multiselect.png)
+
 ## Validation
 
 - JDK 21: `./gradlew --no-daemon compileJava processResources nodeQlSmokeTest`.
-- 175 JavaFX/SQLite checks: block sizes and alignment, reporter drop targets,
+- 199 JavaFX/SQLite checks: block sizes and alignment, reporter drop targets,
   insertion/detachment, nested undo, SQL generation, quoting, SQLite function
   execution, inline result shape/order and content bounds; shared theme state,
   two-way toggles, multiple windows, rendered block text and scene cleanup;
@@ -56,6 +60,9 @@ inline SQLite results. Only generated test data is shown.
   table/column inputs, live filtering, identifier escaping and custom expressions;
   alias-qualified JOIN execution, multi-column projections, generated/view/temp
   columns, table/schema changes and nested reporter undo.
+- Multi-selection checks include preselection/order, wildcard handling, search,
+  Apply/Cancel, custom expressions, >20 columns, JOIN/grouping execution, embedded
+  reporters, single-step Undo and dialog/theme cleanup.
 - The camera regression fails against `eeedb33` and passes with this fix.
 - Smoke test uses only a temporary in-memory database and closes its editor.
 - Visual comparison against NodeQL commit

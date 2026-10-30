@@ -20,6 +20,10 @@ Version date: 2026-10-11. Installer publication is a separate release workflow.
 - Extend schema suggestions to column/expression inputs, respecting selected
   tables, views, aliases and JOIN ambiguity. Preserve SELECT list prefixes,
   custom expressions and nested reporters; quote qualified identifiers safely.
+- Add real checkbox-based column multi-selection with search, preselected inputs,
+  retained selections across filtering, explicit Apply/Cancel and single-step undo.
+  Keep custom SQL selectable and support SELECT, COLUMN reporters, GROUP BY and
+  function argument lists without the single-suggestion menu's 20-item limit.
 - Add structured conditions, sorting direction, SELECT DISTINCT, table aliases,
   LIMIT/OFFSET and text, alias and SQLite-function reporters.
 - Keep NodeQL nodes session-only; no NodeQL project save/load persistence.

@@ -1381,7 +1381,9 @@ public final class NodeQlBuilderWindow {
                                     ColumnSuggestions.quote(name))).toList(), false));
                 } else if (isColumnInput(template, key)) {
                     slot.getChildren().setAll(new SchemaInput(field, "columns",
-                            () -> loadColumnSuggestions(this, key), key.equals("columns") || key.equals("args")));
+                            () -> loadColumnSuggestions(this, key), key.equals("columns") || key.equals("args")
+                                    || template.type == BlockType.SQL_COLUMN
+                                    || template.type == BlockType.SQL_GROUP_BY));
                 }
                 slot.setAlignment(Pos.CENTER_LEFT);
                 inputSlots.put(key, slot);

@@ -111,6 +111,13 @@ Der Builder unterstützt:
   Für mehrere SELECT-Spalten ein Komma tippen und die nächste Spalte auswählen;
   vorherige Listenelemente und Kommas in Funktionen/Strings bleiben erhalten.
   Ausdrücke wie `COALESCE(name, 'unknown')` können weiterhin frei eingegeben werden.
+- Echte Mehrfachauswahl über `☑` neben Listenfeldern: Spalten anhaken und mit
+  `Apply` gemeinsam übernehmen. Die Checkbox-Liste ist durchsuchbar, behält
+  Markierungen beim Filtern und belegt bestehende Spalten vor. `Cancel` verändert
+  die Eingabe nicht; die Übernahme lässt sich mit einem Undo zurücknehmen.
+  Die Funktion steht in SELECT, COLUMN-Reportern, GROUP BY und Funktionsargumenten
+  bereit. Eigene SQL-Ausdrücke werden als markierte `Custom SQL`-Einträge erhalten
+  und können gezielt abgewählt werden. Konkrete Spalten ersetzen eine `*`-Auswahl.
 - Text-, Alias- und SQLite-Funktionsreporter; beispielsweise `datetime(unix_timestamp, 'unixepoch')`
 - Snapping unter `EXECUTE QUERY`
 - Löschen ausgewählter Nodes über `Delete`, `Backspace` oder den `Delete`-Toolbar-Button; Texteingaben bleiben dabei editierbar
@@ -251,8 +258,12 @@ Tabellen, Views/Temp-Tabellen, Identifier-Quoting und freie SQL-Eingaben geprüf
 Die Spaltentests prüfen zusätzlich Aliasse, JOIN-Mehrdeutigkeiten, generierte
 Spalten, geänderte Quelltabellen und Schemas, Mehrfachprojektionen, verschachtelte
 Reporter/Undo sowie tatsächliche Live-Filterung im Spaltenfeld.
+Die Checkbox-Mehrfachauswahl wird außerdem auf Vorbelegung, Auswahlreihenfolge,
+Filterzustand, Apply/Cancel, Wildcards, freie Ausdrücke, einheitliches Undo und
+Dialog-/Theme-Cleanup geprüft, einschließlich mehr als 20 verfügbarer Spalten.
 Screenshots entstehen unter `build/reports/nodeql/editor.png` (Dark) und
 `build/reports/nodeql/editor-light.png` (Light).
+Zusätzlich entsteht `build/reports/nodeql/columns-multi-selection.png`.
 Ein headless System benötigt für diesen Test eine grafische Umgebung.
 
 ### Manueller Ablauf

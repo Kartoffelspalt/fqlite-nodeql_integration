@@ -19,6 +19,9 @@ import javafx.scene.control.TreeItem;
 import javafx.scene.control.TableView;
 import javafx.scene.control.Button;
 import javafx.scene.control.ContextMenu;
+import javafx.scene.control.Dialog;
+import javafx.scene.control.ButtonType;
+import javafx.beans.property.BooleanProperty;
 import javafx.scene.control.ScrollPane;
 import javafx.scene.control.SplitPane;
 import javafx.scene.layout.HBox;
@@ -184,8 +187,32 @@ public class NodeQlSmokeTest extends Application {
         toggle.fire();
         captureAfterPulse(stage, new File(screenshot.getParentFile(), "editor-light.png"), () -> {
             toggle.fire();
-            captureAfterPulse(stage, screenshot, finished);
+            captureAfterPulse(stage, screenshot, () -> {
+                try { captureMultiPicker(screenshot, finished); }
+                catch (Throwable error) { error.printStackTrace(); System.exit(1); }
+            });
         });
+    }
+
+    private void captureMultiPicker(File screenshot, Runnable finished) throws Exception {
+        Object reporter = null;
+        for (Object block : (List<?>) get(builder, "blocks")) {
+            if (((Enum<?>) get(block, "template")).name().equals("COLUMN")) reporter = block;
+        }
+        if (reporter == null) throw new AssertionError("Missing COLUMN reporter for screenshot");
+        Dialog<?> picker = openMulti(reporter, "column");
+        multiChoice(picker, "id").set(true);
+        multiChoice(picker, "title").set(true);
+        PauseTransition settle = new PauseTransition(Duration.millis(250));
+        settle.setOnFinished(event -> {
+            try {
+                ImageIO.write(SwingFXUtils.fromFXImage(picker.getDialogPane().getScene().snapshot(null), null),
+                        "png", new File(screenshot.getParentFile(), "columns-multi-selection.png"));
+                cancelMulti(picker);
+                finished.run();
+            } catch (Throwable error) { error.printStackTrace(); System.exit(1); }
+        });
+        settle.play();
     }
 
     private void checkBlockTextContrast(Stage stage) {
@@ -283,6 +310,141 @@ public class NodeQlSmokeTest extends Application {
         ContextMenu menu = openSuggestions(block, key);
         menu.getItems().stream().filter(item -> item.getText().equals(label)).findFirst().orElseThrow(
                 () -> new AssertionError("Missing suggestion: " + key + " / " + label)).fire();
+    }
+
+    private Dialog<?> openMulti(Object block, String key) throws Exception {
+        HBox control = schemaInput(block, key);
+        ((Button) control.getChildren().get(2)).fire();
+        return (Dialog<?>) get(control, "activePicker");
+    }
+
+    private BooleanProperty multiChoice(Dialog<?> dialog, String label) throws Exception {
+        for (Object choice : (List<?>) get(dialog, "choices")) {
+            if (get(get(choice, "suggestion"), "label").equals(label)) return (BooleanProperty) get(choice, "selected");
+        }
+        throw new AssertionError("Missing multi-selection choice: " + label);
+    }
+
+    private void applyMulti(Dialog<?> dialog) {
+        ((Button) dialog.getDialogPane().lookupButton(ButtonType.APPLY)).fire();
+    }
+
+    private void cancelMulti(Dialog<?> dialog) {
+        ((Button) dialog.getDialogPane().lookupButton(ButtonType.CANCEL)).fire();
+    }
+
+    private void verifyMultiSelection() throws Exception {
+        Object select = add("SELECT");
+        input(select, "table", "customers");
+        input(select, "table_alias", "c");
+        snap(select, 3880);
+        String before = sql();
+        ScrollPane scroll = (ScrollPane) get(builder, "workspaceScroll");
+        double h = scroll.getHvalue(), v = scroll.getVvalue();
+        Dialog<?> picker = openMulti(select, "columns");
+        int scenes = registeredScenes();
+        check(picker != null && picker.isShowing(), "multi-picker did not open");
+        check(multiChoice(picker, "*").get(), "existing wildcard was not preselected");
+        multiChoice(picker, "customer_id").set(true);
+        multiChoice(picker, "full name").set(true);
+        check(!multiChoice(picker, "*").get(), "specific choices did not clear wildcard");
+        check(sql().equals(before), "checkboxes changed SQL before Apply");
+        ((TextField) get(picker, "filter")).setText("ODD");
+        check(((List<?>) get(picker, "filteredChoices")).size() == 2, "multi-picker search is not case-insensitive");
+        check(multiChoice(picker, "customer_id").get() && multiChoice(picker, "full name").get(), "filtering discarded hidden selections");
+        ((TextField) get(picker, "filter")).clear();
+        ThemeManager.setDark(false);
+        check(picker.getDialogPane().getScene().getRoot().getStyle()
+                .equals(((Stage) get(builder, "stage")).getScene().getRoot().getStyle()), "multi-picker missed shared theme update");
+        ThemeManager.setDark(true);
+        applyMulti(picker);
+        check(sql().contains("SELECT \"customer_id\", \"full name\""), "multi-picker did not apply both columns");
+        try (var statement = db.getConnectionObject().createStatement(); var result = statement.executeQuery(sql())) {
+            check(result.next() && result.getInt(1) == 1 && result.getString(2).equals("Ada"), "multi-selected query did not execute");
+        }
+        check(Math.abs(scroll.getHvalue() - h) < 0.0001 && Math.abs(scroll.getVvalue() - v) < 0.0001, "multi-selection moved the workspace camera");
+        check(registeredScenes() == scenes - 1, "multi-picker leaked its scene: " + scenes + " -> " + registeredScenes());
+        call("undoLastAction");
+        check(sql().equals(before), "multi-selection was not a single undo action");
+        select = ((List<?>) get(builder, "blocks")).getFirst();
+        picker = openMulti(select, "columns");
+        multiChoice(picker, "odd\"col").set(true);
+        cancelMulti(picker);
+        check(sql().equals(before), "Cancel modified the query");
+
+        input(select, "columns", "\"full name\", customer_id");
+        picker = openMulti(select, "columns");
+        check(multiChoice(picker, "full name").get() && multiChoice(picker, "customer_id").get(), "quoted/unquoted existing columns were not preselected");
+        applyMulti(picker);
+        check(sql().contains("SELECT \"full name\", \"customer_id\""), "preselected column order changed");
+        input(select, "columns", "printf('%s,%s', 'a', 'b'), customer_id");
+        picker = openMulti(select, "columns");
+        multiChoice(picker, "full name").set(true);
+        applyMulti(picker);
+        check(sql().contains("printf('%s,%s', 'a', 'b'), \"customer_id\", \"full name\""), "multi-picker corrupted custom expression or its commas");
+        picker = openMulti(select, "columns");
+        ((Button) get(picker, "clear")).fire();
+        check(picker.getDialogPane().lookupButton(ButtonType.APPLY).isDisabled(), "empty selection can be applied");
+        multiChoice(picker, "odd\"col").set(true);
+        multiChoice(picker, "full name").set(true);
+        applyMulti(picker);
+        check(!sql().contains("printf") && sql().contains("\"odd\"\"col\", \"full name\""), "clearing/choosing columns did not replace the previous selection");
+        try (var statement = db.getConnectionObject().createStatement(); var result = statement.executeQuery(sql())) {
+            check(result.next() && result.getString(1).equals("value") && result.getString(2).equals("Ada"), "multi-selection identifier quoting/order");
+        }
+
+        Object join = add("LEFT_JOIN");
+        input(join, "table", "orders AS o");
+        input(join, "on", "c.customer_id = o.customer_id");
+        snap(join, 3936);
+        input(select, "columns", "*");
+        picker = openMulti(select, "columns");
+        multiChoice(picker, "c.customer_id").set(true);
+        multiChoice(picker, "o.amount").set(true);
+        applyMulti(picker);
+        Object group = add("GROUP_BY");
+        snap(group, 4022);
+        picker = openMulti(group, "expr");
+        ((Button) get(picker, "clear")).fire();
+        multiChoice(picker, "c.customer_id").set(true);
+        multiChoice(picker, "o.amount").set(true);
+        applyMulti(picker);
+        check(sql().contains("GROUP BY \"c\".\"customer_id\", \"o\".\"amount\""), "GROUP BY multi-selection");
+        try (var statement = db.getConnectionObject().createStatement(); var result = statement.executeQuery(sql())) {
+            check(result.next() && result.getInt(1) == 1 && result.getInt(2) == 20, "qualified multi-selection with JOIN/grouping did not execute");
+        }
+
+        call("clearWorkspace");
+        select = add("SELECT");
+        input(select, "table", "film");
+        snap(select, 3880);
+        Object reporter = add("COLUMN");
+        call("attachReporter", reporter, select, "columns");
+        picker = openMulti(reporter, "column");
+        multiChoice(picker, "id").set(true);
+        multiChoice(picker, "title").set(true);
+        applyMulti(picker);
+        check(sql().contains("SELECT \"id\", \"title\""), "embedded column reporter multi-selection");
+        Object snapshot = call("captureWorkspaceState");
+        call("clearWorkspace");
+        call("restoreWorkspaceState", snapshot);
+        check(sql().contains("SELECT \"id\", \"title\""), "nested multi-selection undo restoration");
+
+        try (var statement = db.getConnectionObject().createStatement()) {
+            List<String> definitions = new ArrayList<>();
+            for (int i = 0; i < 30; i++) definitions.add("c" + i + " INTEGER");
+            statement.execute("CREATE TABLE wide_columns (" + String.join(", ", definitions) + ")");
+        }
+        call("clearWorkspace");
+        select = add("SELECT");
+        input(select, "table", "wide_columns");
+        snap(select, 3880);
+        picker = openMulti(select, "columns");
+        multiChoice(picker, "c28").set(true);
+        multiChoice(picker, "c29").set(true);
+        applyMulti(picker);
+        check(sql().contains("SELECT \"c28\", \"c29\""), "multi-picker is capped at the first 20 suggestions");
+        call("clearWorkspace");
     }
 
     private void verifyColumnSuggestions() throws Exception {
@@ -530,6 +692,7 @@ public class NodeQlSmokeTest extends Application {
             verifyViewport();
             verifyTableSuggestions();
             verifyColumnSuggestions();
+            verifyMultiSelection();
             Object select = add("SELECT");
             input(select, "table", "film");
             snap(select, 3880);
