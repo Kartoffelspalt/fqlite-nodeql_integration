@@ -47,5 +47,5 @@
 .nodeql-builder .grid-minor { -fx-stroke: -fqlite-border; -fx-opacity: 0.25; }
 .nodeql-builder .block-label { -fx-text-fill: white; -fx-font-size: 15px; -fx-font-weight: bold; }
 .nodeql-builder .credit { -fx-text-fill: -fqlite-muted; -fx-font-size: 10px; }
-.nodeql-builder .table-name-input { -fx-alignment: center-left; }
-.nodeql-builder .table-suggestions-button { -fx-background-color: rgba(255,255,255,0.20); -fx-text-fill: white; -fx-border-color: rgba(255,255,255,0.62); -fx-background-radius: 20; -fx-border-radius: 20; -fx-padding: 2 5; -fx-pref-height: 26; }
+.nodeql-builder .schema-input { -fx-alignment: center-left; }
+.nodeql-builder .schema-suggestions-button { -fx-background-color: rgba(255,255,255,0.20); -fx-text-fill: white; -fx-border-color: rgba(255,255,255,0.62); -fx-background-radius: 20; -fx-border-radius: 20; -fx-padding: 2 5; -fx-pref-height: 26; }

@@ -266,7 +266,150 @@ public class NodeQlSmokeTest extends Application {
     }
 
     private HBox tableInput(Object block) throws Exception {
-        return (HBox) ((Map<String, StackPane>) get(block, "inputSlots")).get("table").getChildren().get(0);
+        return schemaInput(block, "table");
+    }
+
+    private HBox schemaInput(Object block, String key) throws Exception {
+        return (HBox) ((Map<String, StackPane>) get(block, "inputSlots")).get(key).getChildren().get(0);
+    }
+
+    private ContextMenu openSuggestions(Object block, String key) throws Exception {
+        HBox input = schemaInput(block, key);
+        ((Button) input.getChildren().get(1)).fire();
+        return (ContextMenu) get(input, "suggestions");
+    }
+
+    private void choose(Object block, String key, String label) throws Exception {
+        ContextMenu menu = openSuggestions(block, key);
+        menu.getItems().stream().filter(item -> item.getText().equals(label)).findFirst().orElseThrow(
+                () -> new AssertionError("Missing suggestion: " + key + " / " + label)).fire();
+    }
+
+    private void verifyColumnSuggestions() throws Exception {
+        try (var statement = db.getConnectionObject().createStatement()) {
+            statement.execute("CREATE TABLE customers (customer_id INTEGER, \"full name\" TEXT, \"odd\"\"col\" TEXT, "
+                    + "derived TEXT GENERATED ALWAYS AS (\"full name\" || '!') VIRTUAL)");
+            statement.execute("INSERT INTO customers(customer_id, \"full name\", \"odd\"\"col\") VALUES(1, 'Ada', 'value')");
+            statement.execute("CREATE TABLE orders(order_id INTEGER, customer_id INTEGER, amount INTEGER)");
+            statement.execute("INSERT INTO orders VALUES (10, 1, 20)");
+        }
+        Object select = add("SELECT");
+        input(select, "table", "main.customers");
+        input(select, "table_alias", "c");
+        snap(select, 3880);
+        ContextMenu menu = openSuggestions(select, "columns");
+        check(menu.getItems().stream().anyMatch(item -> item.getText().equals("derived")), "generated columns omitted");
+        check(menu.getItems().stream().noneMatch(item -> item.getText().equals("title")), "unrelated table columns suggested");
+        menu.hide();
+        choose(select, "columns", "full name");
+        check(sql().contains("SELECT \"full name\""), "column identifier with spaces was not quoted");
+        try (var statement = db.getConnectionObject().createStatement(); var result = statement.executeQuery(sql())) {
+            check(result.next() && result.getString(1).equals("Ada"), "selected column did not execute");
+        }
+        choose(select, "columns", "c.customer_id");
+        check(sql().contains("SELECT \"c\".\"customer_id\""), "SELECT alias qualification");
+        input(select, "columns", "*");
+        choose(select, "columns", "c.*");
+        try (var statement = db.getConnectionObject().createStatement(); var result = statement.executeQuery(sql())) {
+            check(result.next() && result.getMetaData().getColumnCount() == 4, "qualified wildcard suggestion did not execute");
+        }
+        input(select, "columns", "\"c\".\"customer_id\", fu");
+        choose(select, "columns", "full name");
+        check(sql().contains("\"c\".\"customer_id\", \"full name\""), "SELECT list prefix was overwritten");
+        try (var statement = db.getConnectionObject().createStatement(); var result = statement.executeQuery(sql())) {
+            check(result.next() && result.getInt(1) == 1 && result.getString(2).equals("Ada"), "multiple suggested columns did not execute");
+        }
+        input(select, "columns", "printf('%s,%s', 'a', 'b'), fu");
+        choose(select, "columns", "full name");
+        check(sql().contains("printf('%s,%s', 'a', 'b'), \"full name\""), "function/string commas damaged projection list");
+        choose(select, "columns", "odd\"col");
+        check(sql().contains("\"odd\"\"col\""), "column quote escaping");
+        try (var statement = db.getConnectionObject().createStatement(); var result = statement.executeQuery(sql())) {
+            check(result.next() && result.getString(2).equals("value"), "quoted column did not execute");
+        }
+        input(select, "columns", "COALESCE(\"full name\", 'unknown')");
+        menu = openSuggestions(select, "columns");
+        menu.hide();
+        check(sql().contains("COALESCE(\"full name\", 'unknown')"), "opening/dismissing column suggestions changed custom expression");
+
+        Object join = add("LEFT_JOIN");
+        input(join, "table", "orders AS o");
+        input(join, "on", "c.customer_id = o.customer_id");
+        snap(join, 3936);
+        menu = openSuggestions(select, "columns");
+        List<String> labels = menu.getItems().stream().map(item -> item.getText()).toList();
+        check(labels.containsAll(List.of("c.customer_id", "o.customer_id")), "join alias columns missing");
+        check(!labels.contains("customer_id"), "ambiguous unqualified join column suggested");
+        menu.hide();
+        input(select, "columns", "\"c\".\"customer_id\", ");
+        choose(select, "columns", "o.amount");
+        try (var statement = db.getConnectionObject().createStatement(); var result = statement.executeQuery(sql())) {
+            check(result.next() && result.getInt(1) == 1 && result.getInt(2) == 20, "qualified join column suggestion did not execute");
+        }
+        menu = openSuggestions(join, "on");
+        check(menu.getItems().stream().anyMatch(item -> item.getText().equals("o.customer_id")), "JOIN condition has no column suggestions");
+        menu.hide();
+        for (String[] entry : List.of(new String[]{"WHERE", "column"}, new String[]{"ORDER_BY", "column"},
+                new String[]{"GROUP_BY", "expr"}, new String[]{"COUNT", "expr"},
+                new String[]{"SQLITE_FUNCTION", "args"}, new String[]{"ALIAS", "value"})) {
+            Object block = add(entry[0]);
+            menu = openSuggestions(block, entry[1]);
+            check(menu.getItems().stream().anyMatch(item -> item.getText().equals("c.customer_id")), "missing column suggestions in " + entry[0]);
+            menu.hide();
+        }
+        try (var statement = db.getConnectionObject().createStatement()) {
+            statement.execute("ALTER TABLE customers ADD COLUMN bonus INTEGER");
+        }
+        menu = openSuggestions(select, "columns");
+        check(menu.getItems().stream().anyMatch(item -> item.getText().equals("bonus")), "column schema refresh");
+        menu.hide();
+        input(select, "table", "film");
+        menu = openSuggestions(select, "columns");
+        check(menu.getItems().stream().anyMatch(item -> item.getText().equals("title"))
+                && menu.getItems().stream().noneMatch(item -> item.getText().equals("full name")), "columns did not follow changed source table");
+        menu.hide();
+        input(select, "table", "customers");
+        input(select, "table_alias", "\"");
+        menu = openSuggestions(select, "columns");
+        check(((Map<String, TextField>) get(select, "fields")).get("table_alias").getText().equals("\""), "incomplete custom alias was modified or crashed suggestions");
+        menu.hide();
+        input(select, "table_alias", "c");
+        Object from = add("FROM");
+        input(from, "table", "film_view");
+        snap(from, 3936);
+        menu = openSuggestions(select, "columns");
+        check(menu.getItems().stream().anyMatch(item -> item.getText().equals("film_view.title"))
+                && menu.getItems().stream().noneMatch(item -> item.getText().equals("c.customer_id")), "FROM override/view columns are wrong");
+        menu.hide();
+        call("clearWorkspace");
+        select = add("SELECT");
+        input(select, "table", "temp.temporary_choices");
+        menu = openSuggestions(select, "columns");
+        check(menu.getItems().stream().anyMatch(item -> item.getText().equals("id")), "temporary table columns missing");
+        menu.hide();
+        input(select, "table", "\"Order Items\" AS \"order alias\"");
+        menu = openSuggestions(select, "columns");
+        check(menu.getItems().stream().anyMatch(item -> item.getText().equals("order alias.id")), "quoted table/alias parsing");
+        menu.hide();
+        call("clearWorkspace");
+        select = add("SELECT");
+        input(select, "table", "customers");
+        input(select, "table_alias", "c");
+        snap(select, 3880);
+        Object reporter = add("COLUMN");
+        call("attachReporter", reporter, select, "columns");
+        choose(reporter, "column", "c.full name");
+        check(sql().contains("SELECT \"c\".\"full name\""), "nested reporter lost table/alias context");
+        check(!schemaInput(select, "columns").isVisible(), "embedded reporter left a visible suggestion button behind");
+        Object state = call("captureWorkspaceState");
+        call("clearWorkspace");
+        call("restoreWorkspaceState", state);
+        check(sql().contains("SELECT \"c\".\"full name\""), "undo lost chosen column in nested reporter");
+        select = ((List<?>) get(builder, "blocks")).get(0);
+        reporter = ((List<?>) get(builder, "blocks")).get(1);
+        call("detachReporter", reporter);
+        check(schemaInput(select, "columns").isVisible(), "detaching reporter did not restore column suggestions");
+        call("clearWorkspace");
     }
 
     private void verifyTableSuggestions() throws Exception {
@@ -344,6 +487,26 @@ public class NodeQlSmokeTest extends Application {
         editor.setText("film");
         ((Button) get(builder, "runQueryButton")).requestFocus();
         menu.hide();
+
+        Object reporter = null;
+        for (Object block : (List<?>) get(builder, "blocks")) {
+            if (((Enum<?>) get(block, "template")).name().equals("COLUMN")) reporter = block;
+        }
+        if (reporter == null) throw new AssertionError("Missing final COLUMN reporter");
+        String originalQuery = sql();
+        control = schemaInput(reporter, "column");
+        editor = (TextField) control.getChildren().get(0);
+        menu = (ContextMenu) get(control, "suggestions");
+        editor.requestFocus();
+        editor.setText("TiT");
+        check(menu.isShowing(), "typing into a focused column field did not show suggestions");
+        check(menu.getItems().stream().map(item -> item.getText()).toList().equals(List.of("title", "film.title")), "column filtering is not case-insensitive/contextual");
+        editor.setText("LOWER(title)");
+        check(editor.getText().equals("LOWER(title)"), "column suggestions replaced custom expression");
+        editor.setText("*");
+        ((Button) get(builder, "runQueryButton")).requestFocus();
+        menu.hide();
+        check(sql().equals(originalQuery), "live column tests did not restore the original query");
     }
     @Override public void start(Stage owner) {
         try {
@@ -366,6 +529,7 @@ public class NodeQlSmokeTest extends Application {
             verifyInitialTheme();
             verifyViewport();
             verifyTableSuggestions();
+            verifyColumnSuggestions();
             Object select = add("SELECT");
             input(select, "table", "film");
             snap(select, 3880);

@@ -1005,8 +1005,7 @@ public final class NodeQlBuilderWindow {
             parent.reporters.remove(target.reporterKey);
             StackPane slot = parent.inputSlots.get(target.reporterKey);
             slot.getChildren().remove(target);
-            parent.fields.get(target.reporterKey).setVisible(true);
-            parent.fields.get(target.reporterKey).setManaged(true);
+            parent.setInputVisible(target.reporterKey, true);
             parent.refreshGeometry();
         }
         blocks.remove(target);
@@ -1074,8 +1073,7 @@ public final class NodeQlBuilderWindow {
         reporter.setLayoutX(0);
         reporter.setLayoutY(0);
         parent.reporters.put(key, reporter);
-        parent.fields.get(key).setVisible(false);
-        parent.fields.get(key).setManaged(false);
+        parent.setInputVisible(key, false);
         parent.inputSlots.get(key).getChildren().add(reporter);
         parent.refreshGeometry();
     }
@@ -1087,8 +1085,7 @@ public final class NodeQlBuilderWindow {
         StackPane slot = parent.inputSlots.get(reporter.reporterKey);
         slot.getChildren().remove(reporter);
         parent.reporters.remove(reporter.reporterKey);
-        parent.fields.get(reporter.reporterKey).setVisible(true);
-        parent.fields.get(reporter.reporterKey).setManaged(true);
+        parent.setInputVisible(reporter.reporterKey, true);
         reporter.reporterOwner = null;
         reporter.reporterKey = null;
         workspace.getChildren().add(reporter);
@@ -1235,6 +1232,43 @@ public final class NodeQlBuilderWindow {
         return names;
     }
 
+    private boolean isColumnInput(BlockTemplate template, String key) {
+        return List.of("columns", "column", "expr", "a", "b", "lhs", "on", "predicate", "when", "then", "else", "cond").contains(key)
+                || template.type == BlockType.SQL_ALIAS && key.equals("value")
+                || template.type == BlockType.SQL_FUNCTION && key.equals("args");
+    }
+
+    private List<SchemaInput.Suggestion> loadColumnSuggestions(BlockView block, String key) {
+        BlockView root = block;
+        while (root.reporterOwner != null) root = root.reporterOwner;
+        BlockView primary = null;
+        List<BlockView> sources = new ArrayList<>();
+        for (BlockView candidate : blocks) {
+            if (!candidate.snapped || !candidate.fields.containsKey("table")) continue;
+            if (isJoin(candidate.template.type) || candidate.template.type == BlockType.SQL_CROSS_JOIN
+                    || candidate.template.type == BlockType.SQL_NATURAL_JOIN) sources.add(candidate);
+            else if (primary == null || candidate.template.type == BlockType.SQL_FROM) primary = candidate;
+        }
+        if (primary != null) sources.add(0, primary);
+        if (!root.snapped && root.fields.containsKey("table")) {
+            if (!isJoin(root.template.type)) sources.clear();
+            sources.add(root);
+        }
+        List<ColumnSuggestions.Table> tables = new ArrayList<>();
+        for (BlockView source : sources) {
+            String alias = source.fields.containsKey("table_alias") ? source.fields.get("table_alias").getText()
+                    : source.template.type == BlockType.SQL_SELF_JOIN ? "t2" : "";
+            var table = ColumnSuggestions.Table.parse(source.fields.get("table").getText(), alias);
+            if (table != null) tables.add(table);
+        }
+        if (sources.isEmpty()) {
+            for (String name : loadTableNames()) tables.add(new ColumnSuggestions.Table("", name, name));
+        }
+        boolean wildcard = key.equals("columns") || block.template.type == BlockType.SQL_COLUMN
+                || block.template.type == BlockType.SQL_COUNT;
+        return ColumnSuggestions.load(database.getConnectionObject(), tables, wildcard);
+    }
+
     private double clamp(double value, double min, double max) {
         return Math.max(min, Math.min(max, value));
     }
@@ -1342,7 +1376,12 @@ public final class NodeQlBuilderWindow {
                 }
                 StackPane slot = new StackPane(field);
                 if ("table".equals(key)) {
-                    slot.getChildren().setAll(new TableNameInput(field, NodeQlBuilderWindow.this::loadTableNames));
+                    slot.getChildren().setAll(new SchemaInput(field, "tables and views",
+                            () -> loadTableNames().stream().map(name -> new SchemaInput.Suggestion(name,
+                                    ColumnSuggestions.quote(name))).toList(), false));
+                } else if (isColumnInput(template, key)) {
+                    slot.getChildren().setAll(new SchemaInput(field, "columns",
+                            () -> loadColumnSuggestions(this, key), key.equals("columns") || key.equals("args")));
                 }
                 slot.setAlignment(Pos.CENTER_LEFT);
                 inputSlots.put(key, slot);
@@ -1433,6 +1472,14 @@ public final class NodeQlBuilderWindow {
             getChildren().addAll(0, List.of(shape, highlight));
             updateStyle(selected == this);
             if (reporterOwner != null) reporterOwner.refreshGeometry();
+        }
+
+        private void setInputVisible(String key, boolean visible) {
+            javafx.scene.Node input = inputSlots.get(key).getChildren().getFirst();
+            input.setVisible(visible);
+            input.setManaged(visible);
+            fields.get(key).setVisible(visible);
+            fields.get(key).setManaged(visible);
         }
 
         private void updateStyle(boolean selected) {

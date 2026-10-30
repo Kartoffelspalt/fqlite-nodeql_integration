@@ -104,6 +104,13 @@ Der Builder unterstützt:
   Groß-/Kleinschreibung. Auch `Cmd/Ctrl` + `Leertaste` oder `↓` öffnet die Liste.
   `Esc` schließt sie. Freier Text und eigene SQL-Ausdrücke bleiben erlaubt.
   Gewählte Namen werden automatisch als SQL-Identifier zitiert.
+- Spaltenvorschläge in SELECT, WHERE, GROUP BY, ORDER BY, JOIN-Bedingungen und
+  passenden Reporter-/Funktionsfeldern. Die Auswahl berücksichtigt Tabellen,
+  Views, temporäre Tabellen und Aliasse. Bei gleichnamigen JOIN-Spalten werden
+  eindeutige Referenzen wie `c.customer_id` oder `o.customer_id` angeboten.
+  Für mehrere SELECT-Spalten ein Komma tippen und die nächste Spalte auswählen;
+  vorherige Listenelemente und Kommas in Funktionen/Strings bleiben erhalten.
+  Ausdrücke wie `COALESCE(name, 'unknown')` können weiterhin frei eingegeben werden.
 - Text-, Alias- und SQLite-Funktionsreporter; beispielsweise `datetime(unix_timestamp, 'unixepoch')`
 - Snapping unter `EXECUTE QUERY`
 - Löschen ausgewählter Nodes über `Delete`, `Backspace` oder den `Delete`-Toolbar-Button; Texteingaben bleiben dabei editierbar
@@ -241,6 +248,9 @@ JavaFX-Maus-Handler bei 70/100/140 % Zoom, Kamerastabilität beim Verstellen der
 Panels, explizites Panning und Zoom um den bisherigen Ausschnitt. Vorschläge werden
 für jeden Block mit Tabellenfeld, Filterung bei laufender Eingabe, `Esc`, neue
 Tabellen, Views/Temp-Tabellen, Identifier-Quoting und freie SQL-Eingaben geprüft.
+Die Spaltentests prüfen zusätzlich Aliasse, JOIN-Mehrdeutigkeiten, generierte
+Spalten, geänderte Quelltabellen und Schemas, Mehrfachprojektionen, verschachtelte
+Reporter/Undo sowie tatsächliche Live-Filterung im Spaltenfeld.
 Screenshots entstehen unter `build/reports/nodeql/editor.png` (Dark) und
 `build/reports/nodeql/editor-light.png` (Light).
 Ein headless System benötigt für diesen Test eine grafische Umgebung.

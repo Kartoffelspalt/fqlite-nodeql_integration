@@ -17,6 +17,9 @@ Version date: 2026-10-11. Installer publication is a separate release workflow.
 - Suggest current tables, views and temporary tables in every table input, with
   case-insensitive filtering and SQL identifier quoting. Custom SQL input remains
   fully editable; schema suggestions refresh when the input/list is opened.
+- Extend schema suggestions to column/expression inputs, respecting selected
+  tables, views, aliases and JOIN ambiguity. Preserve SELECT list prefixes,
+  custom expressions and nested reporters; quote qualified identifiers safely.
 - Add structured conditions, sorting direction, SELECT DISTINCT, table aliases,
   LIMIT/OFFSET and text, alias and SQLite-function reporters.
 - Keep NodeQL nodes session-only; no NodeQL project save/load persistence.

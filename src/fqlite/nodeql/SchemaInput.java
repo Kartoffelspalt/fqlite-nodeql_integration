@@ -17,32 +17,36 @@ import java.util.Locale;
 import java.util.function.Supplier;
 
 /** Optional schema suggestions around an ordinary, freely editable SQL input. */
-final class TableNameInput extends HBox {
+final class SchemaInput extends HBox {
     private final TextField editor;
-    private final Supplier<List<String>> tableSource;
+    record Suggestion(String label, String sql) {}
+
+    private final Supplier<List<Suggestion>> source;
+    private final boolean projectionList;
     private final ContextMenu suggestions = new ContextMenu();
-    private List<String> tables = List.of();
+    private List<Suggestion> entries = List.of();
     private boolean choosing;
 
-    TableNameInput(TextField editor, Supplier<List<String>> tableSource) {
+    SchemaInput(TextField editor, String kind, Supplier<List<Suggestion>> source, boolean projectionList) {
         super(3);
         this.editor = editor;
-        this.tableSource = tableSource;
-        getStyleClass().add("table-name-input");
+        this.source = source;
+        this.projectionList = projectionList;
+        getStyleClass().add("schema-input");
         Button browse = new Button("▾");
-        browse.getStyleClass().add("table-suggestions-button");
-        browse.setAccessibleText("Suggest existing tables");
-        browse.setTooltip(new Tooltip("Existing tables and views · custom SQL input is also allowed"));
+        browse.getStyleClass().add("schema-suggestions-button");
+        browse.setAccessibleText("Suggest existing " + kind);
+        browse.setTooltip(new Tooltip("Existing " + kind + " · custom SQL input is also allowed"));
         browse.setFocusTraversable(false);
         browse.setOnAction(event -> {
-            tables = tableSource.get();
+            entries = source.get();
             showSuggestions(false);
         });
         // Popup menus may take native window focus while the editor remains the scene's
         // focus owner. Hiding on editor.focused=false would immediately close the popup.
         ChangeListener<javafx.scene.Node> focusListener = (observable, previous, focused) -> {
             if (focused == editor && !choosing) {
-                tables = tableSource.get();
+                entries = source.get();
                 showSuggestions(false);
             } else if (focused != editor && focused != browse) suggestions.hide();
         };
@@ -57,7 +61,7 @@ final class TableNameInput extends HBox {
                 event.consume();
             } else if ((event.getCode() == KeyCode.SPACE && event.isShortcutDown())
                     || (event.getCode() == KeyCode.DOWN && !suggestions.isShowing())) {
-                tables = tableSource.get();
+                entries = source.get();
                 showSuggestions(false);
                 event.consume();
             }
@@ -75,17 +79,19 @@ final class TableNameInput extends HBox {
     private void showSuggestions(boolean filter) {
         if (editor.getScene() == null || editor.getScene().getWindow() == null
                 || !editor.getScene().getWindow().isShowing()) return;
-        String query = filter ? editor.getText().strip() : "";
+        String query = filter ? editor.getText().substring(projectionStart(editor.getText())).strip() : "";
         if (query.startsWith("\"")) query = query.substring(1);
         if (query.endsWith("\"")) query = query.substring(0, query.length() - 1);
         String search = query.replace("\"\"", "\"").toLowerCase(Locale.ROOT);
         suggestions.getItems().clear();
-        tables.stream().filter(name -> name.toLowerCase(Locale.ROOT).contains(search)).limit(20).forEach(name -> {
-            MenuItem item = new MenuItem(name);
+        entries.stream().filter(entry -> entry.label().replace("\"", "").toLowerCase(Locale.ROOT).contains(search.replace("\"", "")))
+                .limit(20).forEach(entry -> {
+            MenuItem item = new MenuItem(entry.label());
             item.setOnAction(event -> {
                 choosing = true;
-                // Schema names are identifiers, not SQL expressions. Quote even keywords/spaces.
-                editor.setText("\"" + name.replace("\"", "\"\"") + "\"");
+                // Preserve earlier projections; replace only the final top-level list item.
+                String prefix = editor.getText().substring(0, projectionStart(editor.getText()));
+                editor.setText(prefix + (prefix.isEmpty() ? "" : " ") + entry.sql());
                 suggestions.hide();
                 editor.requestFocus();
                 editor.positionCaret(editor.getLength());
@@ -95,5 +101,24 @@ final class TableNameInput extends HBox {
         });
         if (suggestions.getItems().isEmpty()) suggestions.hide();
         else if (!suggestions.isShowing()) suggestions.show(editor, Side.BOTTOM, 0, 2);
+    }
+    private int projectionStart(String text) {
+        if (!projectionList) return 0;
+        int start = 0, depth = 0;
+        char quote = 0;
+        for (int i = 0; i < text.length(); i++) {
+            char c = text.charAt(i);
+            if (quote != 0) {
+                if (c == quote) {
+                    if (i + 1 < text.length() && text.charAt(i + 1) == quote) i++;
+                    else quote = 0;
+                }
+            } else if (c == '\'' || c == '"' || c == '`') quote = c;
+            else if (c == '[') quote = ']';
+            else if (c == '(') depth++;
+            else if (c == ')') depth = Math.max(0, depth - 1);
+            else if (c == ',' && depth == 0) start = i + 1;
+        }
+        return start;
     }
 }

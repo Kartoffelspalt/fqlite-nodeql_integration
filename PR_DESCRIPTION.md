@@ -26,6 +26,9 @@ Prepare the application as version 5.1.
   separate block dragging from explicit right/middle-button canvas panning.
 - Suggest existing tables/views in all table inputs with live filtering, schema
   refresh and identifier quoting, while retaining unrestricted custom SQL input.
+- Suggest columns in SELECT, filters, grouping, sorting, JOINs and expression
+  reporters. Respect table aliases, omit ambiguous bare JOIN names, preserve
+  previous SELECT list entries and keep custom SQL fully editable.
 - Share the main application's Light/Dark setting and toggle styling, with live
   synchronization across the main app, builders and expanded results. No separate
   NodeQL theme preference or new restart persistence is introduced.
@@ -45,12 +48,14 @@ inline SQLite results. Only generated test data is shown.
 ## Validation
 
 - JDK 21: `./gradlew --no-daemon compileJava processResources nodeQlSmokeTest`.
-- 139 JavaFX/SQLite checks: block sizes and alignment, reporter drop targets,
+- 175 JavaFX/SQLite checks: block sizes and alignment, reporter drop targets,
   insertion/detachment, nested undo, SQL generation, quoting, SQLite function
   execution, inline result shape/order and content bounds; shared theme state,
   two-way toggles, multiple windows, rendered block text and scene cleanup;
   detach/reattach mouse gestures at three zoom levels, viewport stability, panning,
-  all table inputs, live filtering, identifier escaping and custom expressions.
+  table/column inputs, live filtering, identifier escaping and custom expressions;
+  alias-qualified JOIN execution, multi-column projections, generated/view/temp
+  columns, table/schema changes and nested reporter undo.
 - The camera regression fails against `eeedb33` and passes with this fix.
 - Smoke test uses only a temporary in-memory database and closes its editor.
 - Visual comparison against NodeQL commit

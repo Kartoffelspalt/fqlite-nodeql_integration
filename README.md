@@ -110,6 +110,9 @@ This is a JavaFX integration, not the standalone Flutter application.
    Every table input offers existing tables and views through **▾**; type to
    filter suggestions, or keep any custom SQL input. Suggested identifiers are
    quoted automatically, including names containing spaces or quotes.
+   Column inputs provide the same suggestions for the selected table(s), including
+   aliases and qualified JOIN columns. In SELECT lists, type a comma to add another
+   suggested column; existing projections and custom SQL expressions are retained.
 3. Click **Run Query** or the yellow start block. SQL and results stay in the
    NodeQL editor; **Expand results** opens a larger result view. Opening the SQL
    Analyzer is optional.
