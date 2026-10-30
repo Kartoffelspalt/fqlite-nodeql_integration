@@ -18,6 +18,18 @@ import javafx.scene.control.TextArea;
 import javafx.scene.control.TreeItem;
 import javafx.scene.control.TableView;
 import javafx.scene.control.Button;
+import javafx.scene.control.ContextMenu;
+import javafx.scene.control.ScrollPane;
+import javafx.scene.control.SplitPane;
+import javafx.scene.layout.HBox;
+import javafx.scene.layout.StackPane;
+import javafx.geometry.Point2D;
+import javafx.geometry.Point3D;
+import javafx.scene.input.MouseEvent;
+import javafx.scene.input.MouseButton;
+import javafx.scene.input.PickResult;
+import javafx.event.Event;
+import javafx.event.EventType;
 import javafx.scene.Scene;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -180,6 +192,159 @@ public class NodeQlSmokeTest extends Application {
         javafx.scene.control.Label blockLabel = (javafx.scene.control.Label) stage.getScene().lookup(".block-label");
         check(blockLabel.getTextFill().equals(Color.WHITE), "light theme reduced palette block text contrast");
     }
+
+    private void mouse(javafx.scene.Node target, EventType<MouseEvent> type, Point2D point, MouseButton button) {
+        Point2D local = target.sceneToLocal(point);
+        boolean pressed = type != MouseEvent.MOUSE_RELEASED;
+        Event.fireEvent(target, new MouseEvent(type, point.getX(), point.getY(), point.getX(), point.getY(),
+                button, 1, false, false, false, false,
+                pressed && button == MouseButton.PRIMARY, false, pressed && button == MouseButton.SECONDARY,
+                false, false, false, new PickResult(target, new Point3D(local.getX(), local.getY(), 0), 1)));
+    }
+
+    private void dragTo(Object block, double x, double y) throws Exception {
+        Region view = (Region) block;
+        Region workspace = (Region) get(builder, "workspace");
+        Point2D start = view.localToScene(10, 10);
+        mouse(view, MouseEvent.MOUSE_PRESSED, start, MouseButton.PRIMARY);
+        mouse(view, MouseEvent.DRAG_DETECTED, start, MouseButton.PRIMARY);
+        Point2D end = workspace.localToScene(x + 10, y + 10);
+        mouse(view, MouseEvent.MOUSE_DRAGGED, end, MouseButton.PRIMARY);
+        mouse(view, MouseEvent.MOUSE_RELEASED, end, MouseButton.PRIMARY);
+        ((Stage) get(builder, "stage")).getScene().getRoot().layout();
+    }
+
+    private void verifyViewport() throws Exception {
+        Stage stage = (Stage) get(builder, "stage");
+        ScrollPane scroll = (ScrollPane) get(builder, "workspaceScroll");
+        Region canvas = (Region) get(builder, "workspace");
+        double h = scroll.getHvalue() + 0.01;
+        double v = scroll.getVvalue() + 0.01;
+        scroll.setHvalue(h);
+        scroll.setVvalue(v);
+        SplitPane panels = (SplitPane) stage.getScene().lookup(".workbench");
+        panels.setDividerPositions(0.28, 0.72);
+        stage.getScene().getRoot().layout();
+        check(Math.abs(scroll.getHvalue() - h) < 0.0001, "resizing panels reset horizontal camera");
+        check(Math.abs(scroll.getVvalue() - v) < 0.0001, "resizing panels reset vertical camera");
+        Object select = add("SELECT");
+        input(select, "table", "film");
+        snap(select, 3880);
+        stage.getScene().getRoot().layout();
+        for (double scale : new double[]{1, 0.7, 1.4}) {
+            Point2D before = canvas.sceneToLocal(scroll.localToScene(
+                    scroll.getViewportBounds().getWidth() / 2, scroll.getViewportBounds().getHeight() / 2));
+            call("setZoom", scale);
+            stage.getScene().getRoot().layout();
+            Point2D after = canvas.sceneToLocal(scroll.localToScene(
+                    scroll.getViewportBounds().getWidth() / 2, scroll.getViewportBounds().getHeight() / 2));
+            check(before.distance(after) < 5, "zoom lost the current camera position");
+            for (int cycle = 0; cycle < 3; cycle++) {
+                h = scroll.getHvalue();
+                v = scroll.getVvalue();
+                dragTo(select, 4050, 3970);
+                check(!(Boolean) get(select, "snapped"), "drag did not detach node");
+                dragTo(select, 3800, 3880);
+                check((Boolean) get(select, "snapped"), "drag did not reattach node");
+                check(Math.abs(scroll.getHvalue() - h) < 0.0001, "node drag panned horizontally");
+                check(Math.abs(scroll.getVvalue() - v) < 0.0001, "node drag panned vertically");
+                check(sql().contains("FROM film"), "reattached query was not restored");
+            }
+        }
+        call("setZoom", 1.0);
+        h = scroll.getHvalue();
+        v = scroll.getVvalue();
+        Point2D start = scroll.localToScene(60, 60);
+        mouse(canvas, MouseEvent.MOUSE_PRESSED, start, MouseButton.SECONDARY);
+        mouse(canvas, MouseEvent.MOUSE_DRAGGED, start.add(60, 40), MouseButton.SECONDARY);
+        mouse(canvas, MouseEvent.MOUSE_RELEASED, start.add(60, 40), MouseButton.SECONDARY);
+        check(scroll.getHvalue() < h && scroll.getVvalue() < v, "explicit empty-canvas panning stopped working");
+        call("clearWorkspace");
+        panels.setDividerPositions(0.25, 0.73);
+        stage.getScene().getRoot().layout();
+        call("centerOnChain");
+    }
+
+    private HBox tableInput(Object block) throws Exception {
+        return (HBox) ((Map<String, StackPane>) get(block, "inputSlots")).get("table").getChildren().get(0);
+    }
+
+    private void verifyTableSuggestions() throws Exception {
+        try (var statement = db.getConnectionObject().createStatement()) {
+            statement.execute("CREATE TABLE \"Order Items\" (id INTEGER)");
+            statement.execute("CREATE TABLE \"odd\"\"name\" (id INTEGER)");
+            statement.execute("CREATE VIEW film_view AS SELECT * FROM film");
+            statement.execute("CREATE TEMP TABLE temporary_choices (id INTEGER)");
+            statement.execute("CREATE TABLE numbered (id INTEGER PRIMARY KEY AUTOINCREMENT)");
+        }
+        List<?> names = (List<?>) call("loadTableNames");
+        check(names.containsAll(List.of("film", "film_view", "Order Items", "temporary_choices")), "schema suggestions omit tables, views or temporary tables");
+        check(names.stream().noneMatch(name -> name.toString().startsWith("sqlite_")), "internal SQLite tables leaked into suggestions");
+
+        Class<?> templates = Class.forName("fqlite.nodeql.NodeQlBuilderWindow$BlockTemplate");
+        Method keys = templates.getDeclaredMethod("fieldKeys");
+        keys.setAccessible(true);
+        for (Object template : templates.getEnumConstants()) {
+            if (!((List<?>) keys.invoke(template)).contains("table")) continue;
+            Object block = add(((Enum<?>) template).name());
+            HBox control = tableInput(block);
+            ((Button) control.getChildren().get(1)).fire();
+            ContextMenu menu = (ContextMenu) get(control, "suggestions");
+            check(menu.getItems().stream().anyMatch(item -> item.getText().equals("film")), "table suggestions missing from " + template);
+            menu.hide();
+        }
+        call("clearWorkspace");
+        Object select = add("SELECT");
+        snap(select, 3880);
+        HBox control = tableInput(select);
+        TextField editor = (TextField) control.getChildren().get(0);
+        Button browse = (Button) control.getChildren().get(1);
+        ContextMenu menu = (ContextMenu) get(control, "suggestions");
+        browse.fire();
+        menu.getItems().stream().filter(item -> item.getText().equals("Order Items")).findFirst().orElseThrow().fire();
+        check(editor.getText().equals("\"Order Items\""), "selected schema name was not SQL-quoted");
+        try (var statement = db.getConnectionObject().createStatement(); var result = statement.executeQuery(sql())) {
+            check(result.getMetaData().getColumnCount() == 1, "suggested table with spaces does not execute");
+        }
+        browse.fire();
+        menu.getItems().stream().filter(item -> item.getText().equals("odd\"name")).findFirst().orElseThrow().fire();
+        check(editor.getText().equals("\"odd\"\"name\""), "identifier quote escaping");
+        try (var statement = db.getConnectionObject().createStatement(); var result = statement.executeQuery(sql())) {
+            check(result.getMetaData().getColumnCount() == 1, "suggested quoted table does not execute");
+        }
+        editor.requestFocus();
+        editor.setText("FiLm");
+        Method show = control.getClass().getDeclaredMethod("showSuggestions", boolean.class);
+        show.setAccessible(true);
+        show.invoke(control, true);
+        check(menu.getItems().stream().map(item -> item.getText()).toList().equals(List.of("film", "film_view")), "suggestions are not filtered case-insensitively");
+        editor.setText("(SELECT * FROM film) AS custom");
+        menu.hide();
+        check(editor.getText().equals("(SELECT * FROM film) AS custom") && sql().contains("FROM (SELECT * FROM film) AS custom"), "suggestions replaced custom SQL input");
+        try (var statement = db.getConnectionObject().createStatement()) { statement.execute("CREATE TABLE recently_added (id INTEGER)"); }
+        browse.fire();
+        check(menu.getItems().stream().anyMatch(item -> item.getText().equals("recently_added")), "schema suggestions did not refresh");
+        menu.hide();
+        call("clearWorkspace");
+    }
+
+    private void verifyLiveSuggestions() throws Exception {
+        Object select = ((List<?>) get(builder, "blocks")).get(0);
+        HBox control = tableInput(select);
+        TextField editor = (TextField) control.getChildren().get(0);
+        ContextMenu menu = (ContextMenu) get(control, "suggestions");
+        editor.requestFocus();
+        editor.setText("FiLm");
+        check(menu.isShowing(), "typing into a focused table field did not show suggestions");
+        check(menu.getItems().stream().map(item -> item.getText()).toList().equals(List.of("film", "film_view")), "live typing did not filter table suggestions");
+        Event.fireEvent(editor, new javafx.scene.input.KeyEvent(javafx.scene.input.KeyEvent.KEY_PRESSED,
+                "", "", javafx.scene.input.KeyCode.ESCAPE, false, false, false, false));
+        check(!menu.isShowing(), "Escape did not dismiss table suggestions");
+        check(editor.getText().equals("FiLm"), "dismissing suggestions changed the custom input");
+        editor.setText("film");
+        ((Button) get(builder, "runQueryButton")).requestFocus();
+        menu.hide();
+    }
     @Override public void start(Stage owner) {
         try {
             db = new InMemoryDatabase("NodeQL verification");
@@ -199,6 +364,8 @@ public class NodeQlSmokeTest extends Application {
             builder = new NodeQlBuilderWindow(mainApp, new TreeItem<>(new NodeObject("film.sqlite", true)), db, owner);
             builder.show();
             verifyInitialTheme();
+            verifyViewport();
+            verifyTableSuggestions();
             Object select = add("SELECT");
             input(select, "table", "film");
             snap(select, 3880);
@@ -301,6 +468,7 @@ public class NodeQlSmokeTest extends Application {
                     check(table.getItems().size() == 3, "inline query result row count");
                     check(table.getColumns().size() == 2, "inline query result columns");
                     check(((List<?>) table.getItems().get(0)).get(0).equals("3"), "result sort order");
+                    verifyLiveSuggestions();
                     Stage stage = (Stage) get(builder, "stage");
                     stage.getScene().getRoot().applyCss();
                     stage.getScene().getRoot().layout();
@@ -311,6 +479,8 @@ public class NodeQlSmokeTest extends Application {
                     }
                     File screenshot = new File(System.getProperty("nodeql.screenshot", "build/reports/nodeql/editor.png"));
                     java.nio.file.Files.createDirectories(screenshot.getAbsoluteFile().getParentFile().toPath());
+                    // Explicitly exercise the palette's center action for the full query width.
+                    call("centerOnChain");
                     verifyResultThemes(stage, screenshot, () -> {
                         try {
                             db.getConnectionObject().close();

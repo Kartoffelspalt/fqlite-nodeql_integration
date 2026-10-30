@@ -107,6 +107,9 @@ This is a JavaFX integration, not the standalone Flutter application.
 2. Search the palette, snap statements below `EXECUTE QUERY` and insert oval
    reporters into input slots. Use structured conditions, sorting, aliases,
    SQLite functions, `DISTINCT` and `LIMIT`/`OFFSET` to compose your query.
+   Every table input offers existing tables and views through **▾**; type to
+   filter suggestions, or keep any custom SQL input. Suggested identifiers are
+   quoted automatically, including names containing spaces or quotes.
 3. Click **Run Query** or the yellow start block. SQL and results stay in the
    NodeQL editor; **Expand results** opens a larger result view. Opening the SQL
    Analyzer is optional.
@@ -118,6 +121,10 @@ The **Light/Dark switch** at the right of the toolbar uses FQLite's shared theme
 setting and button style. Switching in either window updates the main app, all
 open NodeQL builders and expanded results. There is no separate NodeQL theme
 preference; like the main app, the selection applies to the current session.
+
+Dragging nodes does not pan or recenter the workspace. Use the empty canvas with
+the right/middle mouse button to pan; zoom preserves the current view. Clicking
+the palette's `EXECUTE QUERY` card explicitly returns to the query chain.
 
 <details>
   <summary>Light theme preview</summary>

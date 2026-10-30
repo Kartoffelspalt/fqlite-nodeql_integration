@@ -22,6 +22,10 @@ Prepare the application as version 5.1.
 - Execute queries directly with inline results and an optional expanded result
   view. Keep the SQL Analyzer as an optional hand-off.
 - Keep nodes session-only: no NodeQL workspace persistence in project files.
+- Keep the workspace camera stable during node dragging, panel resizing and zoom;
+  separate block dragging from explicit right/middle-button canvas panning.
+- Suggest existing tables/views in all table inputs with live filtering, schema
+  refresh and identifier quoting, while retaining unrestricted custom SQL input.
 - Share the main application's Light/Dark setting and toggle styling, with live
   synchronization across the main app, builders and expanded results. No separate
   NodeQL theme preference or new restart persistence is introduced.
@@ -31,7 +35,7 @@ Prepare the application as version 5.1.
 
 ## Screenshot
 
-Current NodeQL for FQLite editor, captured on 2026-10-29 with a sample query and
+Current NodeQL for FQLite editor, captured on 2026-10-30 with a sample query and
 inline SQLite results. Only generated test data is shown.
 
 ![NodeQL for FQLite editor with SQL preview and inline results](img/nodeql-current-editor.png)
@@ -41,10 +45,13 @@ inline SQLite results. Only generated test data is shown.
 ## Validation
 
 - JDK 21: `./gradlew --no-daemon compileJava processResources nodeQlSmokeTest`.
-- 56 JavaFX/SQLite checks: block sizes and alignment, reporter drop targets,
+- 139 JavaFX/SQLite checks: block sizes and alignment, reporter drop targets,
   insertion/detachment, nested undo, SQL generation, quoting, SQLite function
   execution, inline result shape/order and content bounds; shared theme state,
-  two-way toggles, multiple windows, rendered block text and scene cleanup.
+  two-way toggles, multiple windows, rendered block text and scene cleanup;
+  detach/reattach mouse gestures at three zoom levels, viewport stability, panning,
+  all table inputs, live filtering, identifier escaping and custom expressions.
+- The camera regression fails against `eeedb33` and passes with this fix.
 - Smoke test uses only a temporary in-memory database and closes its editor.
 - Visual comparison against NodeQL commit
   `bfbb70c5a6e4035041af05809d2f0f28f484aabd` (upstream version 0.4.3+2).

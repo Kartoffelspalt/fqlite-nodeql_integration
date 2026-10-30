@@ -12,6 +12,11 @@ Version date: 2026-10-11. Installer publication is a separate release workflow.
 - Share FQLite's session-wide Light/Dark theme and toolbar switch. Synchronize
   the main app, NodeQL builders, expanded results and errors in both directions;
   reuse the main palette without introducing separate NodeQL preferences.
+- Prevent workspace jumps during node dragging: separate canvas panning from
+  block drags, remove layout-triggered recentering and keep the zoom center stable.
+- Suggest current tables, views and temporary tables in every table input, with
+  case-insensitive filtering and SQL identifier quoting. Custom SQL input remains
+  fully editable; schema suggestions refresh when the input/list is opened.
 - Add structured conditions, sorting direction, SELECT DISTINCT, table aliases,
   LIMIT/OFFSET and text, alias and SQLite-function reporters.
 - Keep NodeQL nodes session-only; no NodeQL project save/load persistence.

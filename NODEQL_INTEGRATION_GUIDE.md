@@ -99,11 +99,18 @@ Der Builder unterstützt:
 - Formen und Farben nach dem aktuellen [NodeQL-Referenzcode](https://github.com/Kartoffelspalt/NodeQL): Anweisungen, Joins, Mengenoperationen, ovale Reporter und Abschlussblöcke
 - Reporter per Drag-and-drop in Eingabefelder einsetzen, wieder herausziehen und mit Undo wiederherstellen
 - strukturierte WHERE-/AND-/OR-Bedingungen, ASC-/DESC-Auswahl, SELECT DISTINCT, Tabellenalias sowie LIMIT/OFFSET
+- Vorschläge für Tabellen, Views und temporäre Tabellen an allen Tabellenfeldern:
+  `▾` zeigt die Namen der aktiven Datenbank; Tippen filtert ohne Beachtung der
+  Groß-/Kleinschreibung. Auch `Cmd/Ctrl` + `Leertaste` oder `↓` öffnet die Liste.
+  `Esc` schließt sie. Freier Text und eigene SQL-Ausdrücke bleiben erlaubt.
+  Gewählte Namen werden automatisch als SQL-Identifier zitiert.
 - Text-, Alias- und SQLite-Funktionsreporter; beispielsweise `datetime(unix_timestamp, 'unixepoch')`
 - Snapping unter `EXECUTE QUERY`
 - Löschen ausgewählter Nodes über `Delete`, `Backspace` oder den `Delete`-Toolbar-Button; Texteingaben bleiben dabei editierbar
 - große Grid-Arbeitsfläche mit Infinite-Canvas-Gefühl
 - Panning im leeren Workspace-Bereich per rechter oder mittlerer Maustaste
+- stabiler sichtbarer Ausschnitt beim Ab-/Andocken, beim Verstellen der
+  Panelbreiten und beim Zoomen; kein automatisches Rezentrieren während eines Drags
 - Zoom über `+`, `-`, `100%`, Trackpad/Pinch und `Cmd/Ctrl` + Scroll
 - Live-SQL-Vorschau
 
@@ -229,6 +236,11 @@ Der Test enthält außerdem Prüfungen für die Theme-Übernahme, Umschalten in 
 Richtungen, mehrere Builder, Ergebnisfenster, erhaltene Queries/Ergebnisse und
 das Entfernen von Theme-Bindings beim Schließen. Die Blockbeschriftung wird
 zusätzlich anhand der Screenshot-Pixel in beiden Modi geprüft.
+Zusätzliche Regressionen prüfen wiederholtes Ab-/Andocken über die tatsächlichen
+JavaFX-Maus-Handler bei 70/100/140 % Zoom, Kamerastabilität beim Verstellen der
+Panels, explizites Panning und Zoom um den bisherigen Ausschnitt. Vorschläge werden
+für jeden Block mit Tabellenfeld, Filterung bei laufender Eingabe, `Esc`, neue
+Tabellen, Views/Temp-Tabellen, Identifier-Quoting und freie SQL-Eingaben geprüft.
 Screenshots entstehen unter `build/reports/nodeql/editor.png` (Dark) und
 `build/reports/nodeql/editor-light.png` (Light).
 Ein headless System benötigt für diesen Test eine grafische Umgebung.

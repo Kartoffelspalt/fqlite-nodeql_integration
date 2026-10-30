@@ -15,9 +15,11 @@ import javafx.beans.property.SimpleStringProperty;
 import javafx.collections.FXCollections;
 import javafx.collections.ObservableList;
 import javafx.geometry.Insets;
+import javafx.geometry.Bounds;
 import javafx.geometry.Point2D;
 import javafx.geometry.Pos;
 import javafx.scene.Cursor;
+import javafx.scene.Group;
 import javafx.scene.Scene;
 import javafx.scene.effect.DropShadow;
 import javafx.scene.control.Alert;
@@ -91,6 +93,8 @@ public final class NodeQlBuilderWindow {
     private final Stage owner;
     private final Stage stage = new Stage();
     private final Pane workspace = new Pane();
+    // ScrollPane must measure transformed visual bounds, not the unscaled Pane's layout bounds.
+    private final Group workspaceContent = new Group(workspace);
     private final TextArea sqlPreview = new TextArea();
     private final Label zoomLabel = new Label("100%");
     private final Label resultStatus = new Label("Ready to run a query");
@@ -164,6 +168,7 @@ public final class NodeQlBuilderWindow {
         stage.show();
         root.applyCss();
         root.layout();
+        centerOnChain();
         refreshSql();
     }
 
@@ -445,6 +450,7 @@ public final class NodeQlBuilderWindow {
             paletteDragging = selected;
             e.consume();
         });
+        card.setOnDragDetected(event -> event.consume());
         card.setOnMouseDragged(e -> {
             if (paletteDragging == null) return;
             Point2D point = workspace.sceneToLocal(e.getSceneX(), e.getSceneY());
@@ -496,12 +502,12 @@ public final class NodeQlBuilderWindow {
         });
         installCanvasPanning();
 
-        workspaceScroll = new ScrollPane(workspace);
+        workspaceScroll = new ScrollPane(workspaceContent);
         workspaceScroll.setFitToWidth(false);
         workspaceScroll.setFitToHeight(false);
-        workspaceScroll.setPannable(true);
+        // Only the explicit empty-canvas right/middle gesture may pan; block drags must not.
+        workspaceScroll.setPannable(false);
         workspaceScroll.getStyleClass().add("workspace-scroll");
-        workspaceScroll.viewportBoundsProperty().addListener((obs, old, bounds) -> centerOnChain());
         return workspaceScroll;
     }
 
@@ -644,15 +650,17 @@ public final class NodeQlBuilderWindow {
             }
             if (event.getButton() != MouseButton.PRIMARY) return;
             pendingDragSnapshot = captureWorkspaceState();
+            Point2D pointer = workspace.sceneToLocal(event.getSceneX(), event.getSceneY());
             if (view.reporterOwner != null) detachReporter(view);
             view.snapped = false;
             layoutSnappedBlocks();
             dragging = view;
-            dragOffsetX = event.getX();
-            dragOffsetY = event.getY();
+            dragOffsetX = pointer.getX() - view.getLayoutX();
+            dragOffsetY = pointer.getY() - view.getLayoutY();
             view.toFront();
             event.consume();
         });
+        view.setOnDragDetected(event -> event.consume());
         view.setOnMouseDragged(event -> {
             if (dragging != view) {
                 return;
@@ -715,8 +723,8 @@ public final class NodeQlBuilderWindow {
             }
             double dx = event.getSceneX() - panStartX;
             double dy = event.getSceneY() - panStartY;
-            double contentWidth = CANVAS_WIDTH * zoom;
-            double contentHeight = CANVAS_HEIGHT * zoom;
+            double contentWidth = workspaceContent.getLayoutBounds().getWidth();
+            double contentHeight = workspaceContent.getLayoutBounds().getHeight();
             double viewportWidth = Math.max(1, workspaceScroll.getViewportBounds().getWidth());
             double viewportHeight = Math.max(1, workspaceScroll.getViewportBounds().getHeight());
             double maxH = Math.max(1, contentWidth - viewportWidth);
@@ -1181,20 +1189,50 @@ public final class NodeQlBuilderWindow {
     }
 
     private void setZoom(double nextZoom) {
+        Point2D center = workspace.sceneToLocal(workspaceScroll.localToScene(
+                workspaceScroll.getViewportBounds().getWidth() / 2,
+                workspaceScroll.getViewportBounds().getHeight() / 2));
         zoom = Math.max(MIN_ZOOM, Math.min(MAX_ZOOM, nextZoom));
         workspace.setScaleX(zoom);
         workspace.setScaleY(zoom);
         zoomLabel.setText(Math.round(zoom * 100) + "%");
+        workspaceScroll.layout();
+        centerViewportOn(center.getX(), center.getY());
     }
 
     private void centerOnChain() {
         if (workspaceScroll == null) {
             return;
         }
-        double centerX = CHAIN_X + BLOCK_WIDTH / 2;
-        double centerY = CHAIN_START_Y;
-        workspaceScroll.setHvalue(clamp(centerX / CANVAS_WIDTH, 0, 1));
-        workspaceScroll.setVvalue(clamp(centerY / CANVAS_HEIGHT, 0, 1));
+        double width = blocks.stream().filter(block -> block.snapped)
+                .mapToDouble(Region::getPrefWidth).max().orElse(BLOCK_WIDTH);
+        centerViewportOn(CHAIN_X + Math.max(BLOCK_WIDTH, width) / 2, CHAIN_START_Y);
+    }
+
+    private void centerViewportOn(double x, double y) {
+        Point2D point = workspace.localToParent(x, y);
+        Bounds content = workspaceContent.getLayoutBounds();
+        Bounds viewport = workspaceScroll.getViewportBounds();
+        workspaceScroll.setHvalue(clamp((point.getX() - content.getMinX() - viewport.getWidth() / 2)
+                / Math.max(1, content.getWidth() - viewport.getWidth()), 0, 1));
+        workspaceScroll.setVvalue(clamp((point.getY() - content.getMinY() - viewport.getHeight() / 2)
+                / Math.max(1, content.getHeight() - viewport.getHeight()), 0, 1));
+    }
+
+    private List<String> loadTableNames() {
+        String tables = "SELECT name FROM main.sqlite_schema WHERE type IN ('table', 'view') "
+                + "AND name NOT GLOB 'sqlite_*' UNION "
+                + "SELECT name FROM temp.sqlite_schema WHERE type IN ('table', 'view') "
+                + "AND name NOT GLOB 'sqlite_*' ORDER BY name COLLATE NOCASE";
+        List<String> names = new ArrayList<>();
+        try (Statement statement = database.getConnectionObject().createStatement();
+             ResultSet result = statement.executeQuery(tables)) {
+            while (result.next()) names.add(result.getString(1));
+        } catch (SQLException exception) {
+            // Suggestions are optional: a closed/unavailable schema must never block custom input.
+            return List.of();
+        }
+        return names;
     }
 
     private double clamp(double value, double min, double max) {
@@ -1303,6 +1341,9 @@ public final class NodeQlBuilderWindow {
                     field.setPrefHeight(34);
                 }
                 StackPane slot = new StackPane(field);
+                if ("table".equals(key)) {
+                    slot.getChildren().setAll(new TableNameInput(field, NodeQlBuilderWindow.this::loadTableNames));
+                }
                 slot.setAlignment(Pos.CENTER_LEFT);
                 inputSlots.put(key, slot);
                 if (List.of("order", "operator", "select_mode", "function").contains(key)) {
