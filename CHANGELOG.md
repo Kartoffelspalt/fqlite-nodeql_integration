@@ -1,6 +1,8 @@
 # FQLite 5.1 — NodeQL integration update
 
-Version date: 2026-10-11. Installer publication is a separate release workflow.
+Release date: 2026-10-30. This fork's 5.1 release contains source code only;
+prebuilt installers and a bundled JRE are not included. Installer publication
+is a separate release workflow.
 
 - Add a dedicated NodeQL graph icon to the main toolbar and remove the top-menu entry.
 - Align the JavaFX editor with the current NodeQL workbench: dark resizable panels,

@@ -102,6 +102,11 @@ Version **5.1** updates the visual SQLite editor to follow the current
 [NodeQL](https://github.com/Kartoffelspalt/NodeQL) block shapes, colors and workflow.
 This is a JavaFX integration, not the standalone Flutter application.
 
+This fork's [5.1 release](https://github.com/Kartoffelspalt/fqlite-nodeql_integration/releases/tag/5.1)
+provides **source code only**, without prebuilt installers or a bundled JRE.
+Use JDK 21 and the [source launch instructions](#run-from-source) below.
+See the [release notes](docs/releases/5.1.md) for scope and verification.
+
 1. Open a SQLite database in FQLite and click the **NodeQL graph icon in the toolbar**.
    There is no separate NodeQL entry in the top menu bar.
 2. Search the palette, snap statements below `EXECUTE QUERY` and insert oval

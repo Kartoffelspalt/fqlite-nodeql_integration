@@ -8,7 +8,7 @@ Release 5.1: align NodeQL editor with upstream and execute queries in place
 
 Update FQLite's JavaFX NodeQL integration to follow the current NodeQL workbench
 and let users execute visual queries without switching to the SQL Analyzer.
-Prepare the application as version 5.1.
+Release the application as version 5.1.
 
 ## Changes
 
@@ -36,7 +36,7 @@ Prepare the application as version 5.1.
   NodeQL theme preference or new restart persistence is introduced.
 - Bundle Material Icons with its Apache 2.0 license.
 - Update README, changelog, integration guide, screenshot and verification notes.
-- Align Gradle and application version metadata to 5.1 (2026-10-11).
+- Align Gradle and application version metadata to 5.1 (2026-10-30).
 
 ## Screenshot
 
@@ -75,5 +75,5 @@ Native pointer automation, every legacy SQL template and other display densities
 have not been exhaustively tested. The upstream/bundled FQLite PDF manual is
 unchanged; the integration guide covers the updated NodeQL workflow.
 
-Version metadata is prepared for 5.1. Signed installers and the GitHub release
-remain a separate release workflow; this PR does not publish them.
+Version metadata is set to 5.1. The fork's GitHub release is source-only; native
+installer publication remains a separate release workflow.
